@@ -4,467 +4,563 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Nexus Transport PR</title>
+
+  <!-- Tu CSS -->
   <link rel="stylesheet" href="styles.css" />
-
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- jsPDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
 
-<header class="topbar" id="topbar" hidden>
-  <div class="brand">
-    <div class="logo" id="brandLogo">NT</div>
-    <div>
-      <div class="brandName" id="brandName">Nexus Transport PR</div>
-      <div class="brandSub">
-        <span id="whoLine" class="muted">—</span>
-        <span class="pill" id="rolePill">ROL</span>
-      </div>
-    </div>
-  </div>
-
-  <nav class="nav" id="navTabs">
-    <button class="tab active" data-view="dashboard" id="tabDash">Dashboard</button>
-    <button class="tab" data-view="driver" id="tabDriver">Chofer</button>
-
-    <!-- Admin only -->
-    <button class="tab" data-view="adminUsers" id="tabAdminUsers">Usuarios</button>
-    <button class="tab" data-view="adminClients" id="tabAdminClients">Clientes</button>
-    <button class="tab" data-view="adminServices" id="tabAdminServices">Servicios</button>
-    <button class="tab" data-view="adminClose" id="tabAdminClose">Cierres</button>
-    <button class="tab" data-view="adminInvoices" id="tabAdminInvoices">Facturar</button>
-    <button class="tab" data-view="adminSettings" id="tabAdminSettings">Settings</button>
-
-    <button class="tab danger" id="btnLogout">Salir</button>
-  </nav>
-</header>
-
-<main class="container" id="app" hidden>
-
-  <!-- =========================
-       LOGIN (Google)
-  ========================= -->
-  <section class="view active" id="view-login">
-    <div class="card loginCard">
-      <div class="cardHead">
-        <h2>Acceso</h2>
-        <span class="hint">Google Auth + PIN</span>
-      </div>
-
-      <p class="muted" style="margin-top:0">
-        Entra con Google. Luego confirmas PIN (o lo creas si es tu primera vez).
-      </p>
-
-      <div class="actions">
-        <button class="btn primary" id="btnGoogleLogin">Entrar con Google</button>
-        <button class="btn" id="btnReload">Recargar</button>
-      </div>
-
-      <div class="hr"></div>
-
-      <div class="inline2">
-        <div class="card subcard">
-          <h3 style="margin:0 0 8px">PIN</h3>
-          <p class="muted" style="margin:0 0 10px">Si ya tienes PIN, confírmalo.</p>
-          <div class="formRow">
-            <input id="pinInput" type="password" placeholder="PIN" />
-            <button class="btn primary" id="btnPinConfirm">Confirmar</button>
-          </div>
-          <p class="error" id="pinError"></p>
-        </div>
-
-        <div class="card subcard">
-          <h3 style="margin:0 0 8px">Crear / Cambiar PIN</h3>
-          <p class="muted" style="margin:0 0 10px">Primera vez o reset por admin.</p>
-          <div class="formRow">
-            <input id="pinNew" type="password" placeholder="Nuevo PIN" />
-            <input id="pinNew2" type="password" placeholder="Repetir PIN" />
-            <button class="btn" id="btnPinSet">Guardar PIN</button>
-          </div>
-          <p class="hint">El PIN se guarda como hash (no texto).</p>
-          <p class="error" id="pinSetError"></p>
+  <!-- TOPBAR (solo visible cuando autenticado) -->
+  <header class="topbar" id="topbar" hidden>
+    <div class="brand">
+      <div class="logo" aria-label="Logo">NT</div>
+      <div>
+        <div class="brandName" id="brandName">Nexus Transport PR</div>
+        <div class="brandSub">
+          <span id="whoLine">—</span>
+          <span class="muted"> • </span>
+          <span class="tab active" style="pointer-events:none; padding:6px 10px" id="rolePill">—</span>
         </div>
       </div>
-
-      <div class="hr"></div>
-      <div class="muted" id="loginMsg">—</div>
-    </div>
-  </section>
-
-  <!-- =========================
-       DASHBOARD
-  ========================= -->
-  <section class="view" id="view-dashboard">
-    <div class="grid2">
-      <div class="card">
-        <div class="kpiTitle" id="kpiWeekRange">Semana</div>
-        <div class="kpiValue" id="kpiWeekMiles">0.0</div>
-        <div class="kpiSub">Millas</div>
-      </div>
-      <div class="card">
-        <div class="kpiTitle">Servicios</div>
-        <div class="kpiValue" id="kpiWeekServices">0</div>
-        <div class="kpiSub">Conteo</div>
-      </div>
-      <div class="card">
-        <div class="kpiTitle">Neto (Chofer)</div>
-        <div class="kpiValue" id="kpiWeekDriverNet">$0.00</div>
-        <div class="kpiSub">Después % y retención</div>
-      </div>
-      <div class="card">
-        <div class="kpiTitle">Empresa</div>
-        <div class="kpiValue" id="kpiWeekCompany">$0.00</div>
-        <div class="kpiSub">Parte empresa</div>
-      </div>
     </div>
 
-    <div class="inline2">
+    <div class="actions">
+      <button class="btn" id="btnReload" type="button">Recargar</button>
+      <button class="btn danger" id="btnLogout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <!-- APP WRAPPER (solo visible cuando autenticado) -->
+  <main class="container" id="app" hidden>
+
+    <!-- NAV TABS -->
+    <nav class="nav" id="navTabs">
+      <button class="tab active" type="button" data-view="dashboard">Dashboard</button>
+      <button class="tab" type="button" data-view="driver">Mi Historial</button>
+
+      <!-- Admin tabs (se esconden si no es admin) -->
+      <button class="tab" type="button" data-view="adminUsers" id="tabAdminUsers">Usuarios</button>
+      <button class="tab" type="button" data-view="adminClients" id="tabAdminClients">Clientes</button>
+      <button class="tab" type="button" data-view="adminServices" id="tabAdminServices">Servicios</button>
+      <button class="tab" type="button" data-view="adminClose" id="tabAdminClose">Cierre</button>
+      <button class="tab" type="button" data-view="adminInvoices" id="tabAdminInvoices">Facturar</button>
+      <button class="tab" type="button" data-view="adminSettings" id="tabAdminSettings">Settings</button>
+    </nav>
+
+    <!-- =========================
+         VIEW: LOGIN + PIN
+    ========================== -->
+    <section class="view active" id="view-login">
       <div class="card">
         <div class="cardHead">
-          <h2>Entrada rápida</h2>
-          <span class="hint">Chofer: millas + cliente</span>
+          <h2>Acceso</h2>
+          <div class="hint" id="loginMsg">—</div>
+        </div>
+
+        <div class="inline2">
+          <div class="card subcard">
+            <div class="muted" style="margin-bottom:10px">
+              1) Entra con Google (Firebase Auth).<br />
+              2) Confirma tu PIN (o crea PIN si es primera vez).
+            </div>
+
+            <div class="actions">
+              <button class="btnXL primary" id="btnGoogleLogin" type="button">Entrar con Google</button>
+            </div>
+          </div>
+
+          <div class="card subcard">
+            <h3 style="margin:0 0 10px 0">PIN</h3>
+
+            <div class="formGrid">
+              <label class="full">
+                PIN (confirmar)
+                <input id="pinInput" inputmode="numeric" placeholder="••••" />
+              </label>
+              <div class="full actions">
+                <button class="btn primary" id="btnPinConfirm" type="button">Confirmar PIN</button>
+                <span class="muted" id="pinError"></span>
+              </div>
+
+              <div class="full hr"></div>
+
+              <label>
+                PIN nuevo
+                <input id="pinNew" inputmode="numeric" placeholder="Mínimo 4 dígitos" />
+              </label>
+              <label>
+                Confirmar PIN
+                <input id="pinNew2" inputmode="numeric" placeholder="Repite PIN" />
+              </label>
+              <div class="full actions">
+                <button class="btn" id="btnPinSet" type="button">Guardar PIN</button>
+                <span class="muted" id="pinSetError"></span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================
+         VIEW: DASHBOARD
+    ========================== -->
+    <section class="view" id="view-dashboard">
+
+      <div class="grid2">
+        <div class="card">
+          <div class="kpiTitle" id="kpiWeekRange">Semana desde —</div>
+          <div class="kpiValue" id="kpiWeekMiles">0.0</div>
+          <div class="kpiSub">Millas</div>
+        </div>
+
+        <div class="card">
+          <div class="kpiTitle">Servicios</div>
+          <div class="kpiValue" id="kpiWeekServices">0</div>
+          <div class="kpiSub">Conteo semanal</div>
+        </div>
+
+        <div class="card">
+          <div class="kpiTitle">Neto chofer</div>
+          <div class="kpiValue" id="kpiWeekDriverNet">$0.00</div>
+          <div class="kpiSub">Suma semanal (tu usuario)</div>
+        </div>
+
+        <div class="card">
+          <div class="kpiTitle">Empresa</div>
+          <div class="kpiValue" id="kpiWeekCompany">$0.00</div>
+          <div class="kpiSub">Suma semanal</div>
+        </div>
+      </div>
+
+      <div class="inline2">
+        <!-- Quick Entry -->
+        <div class="card">
+          <div class="cardHead">
+            <h2>Entrada rápida (solo millas)</h2>
+            <div class="hint">Chofer escribe • Cliente dinámico • Cálculo automático</div>
+          </div>
+
+          <div class="formGrid">
+            <label>
+              Fecha
+              <input type="date" id="qsDate" />
+            </label>
+
+            <label>
+              Cliente
+              <select id="qsClient"></select>
+            </label>
+
+            <label>
+              Millas
+              <input id="qsMiles" inputmode="decimal" placeholder="Ej: 12.5" />
+            </label>
+
+            <label class="full">
+              Nota (opcional)
+              <input id="qsNote" placeholder="Ej: Servicio nocturno / etc." />
+            </label>
+
+            <div class="full actions">
+              <button class="btn primary" id="btnQuickSave" type="button">Guardar servicio</button>
+              <button class="btn" id="btnQuickClear" type="button">Limpiar</button>
+              <span class="muted" id="quickPreview">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent -->
+        <div class="card">
+          <div class="cardHead">
+            <h2>Servicios recientes (semana)</h2>
+            <div class="hint">Admin puede borrar • Chofer solo ve</div>
+          </div>
+
+          <div class="tableWrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th class="num">Millas</th>
+                  <th class="num">Bruto</th>
+                  <th class="num">Neto chofer</th>
+                  <th class="num">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="dashRecent"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- =========================
+         VIEW: DRIVER HISTORY
+    ========================== -->
+    <section class="view" id="view-driver">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Mi historial</h2>
+          <div class="hint">Agrupa por semana o mes • Exporta en PDF</div>
+        </div>
+
+        <div class="filters">
+          <label>
+            Desde
+            <input type="date" id="drvFrom" />
+          </label>
+
+          <label>
+            Hasta
+            <input type="date" id="drvTo" />
+          </label>
+
+          <label>
+            Agrupar
+            <select id="drvGroup">
+              <option value="none">Detalle</option>
+              <option value="week">Por semana</option>
+              <option value="month">Por mes</option>
+            </select>
+          </label>
+
+          <div class="actions">
+            <button class="btn primary" id="btnDrvFilter" type="button">Aplicar</button>
+            <button class="btn" id="btnDrvPDF" type="button">PDF (jsPDF)</button>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead id="drvHead"></thead>
+            <tbody id="drvBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         VIEW: ADMIN USERS
+    ========================== -->
+    <section class="view" id="view-adminUsers">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Usuarios (admin)</h2>
+          <div class="hint">Invita por email • Reset PIN • Roles</div>
         </div>
 
         <div class="formGrid">
-          <label>Fecha
-            <input type="date" id="qsDate">
+          <label>
+            Email
+            <input id="uEmail" placeholder="chofer@email.com" />
           </label>
-          <label>Cliente
-            <select id="qsClient"></select>
+
+          <label>
+            Rol
+            <select id="uRole">
+              <option value="driver">driver</option>
+              <option value="admin">admin</option>
+            </select>
           </label>
-          <label>Millas
-            <input type="number" step="0.1" min="0" id="qsMiles">
+
+          <label>
+            Activo
+            <select id="uActive">
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
           </label>
-          <label>Nota (opcional)
-            <input id="qsNote" placeholder="Ej. motor / radioboost / etc.">
+
+          <label class="full">
+            Nota
+            <input id="uNote" placeholder="Ej: Turno noche / etc." />
           </label>
+
           <div class="full actions">
-            <button class="btn primary" id="btnQuickSave">Guardar</button>
-            <button class="btn" id="btnQuickClear">Limpiar</button>
+            <button class="btn primary" id="btnInviteUser" type="button">Guardar invitación</button>
+            <button class="btn" id="btnResetPin" type="button">Reset PIN (seleccionado)</button>
           </div>
-          <div class="full hint" id="quickPreview">—</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Activo</th>
+                <th>UID</th>
+                <th>PIN</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+          </table>
         </div>
       </div>
+    </section>
 
+    <!-- =========================
+         VIEW: ADMIN CLIENTS
+    ========================== -->
+    <section class="view" id="view-adminClients">
       <div class="card">
         <div class="cardHead">
-          <h2>Recientes</h2>
-          <span class="hint">Tu semana</span>
+          <h2>Clientes (admin)</h2>
+          <div class="hint">Clientes dinámicos • Tarifa por milla • Connect = ajuste -15%</div>
+        </div>
+
+        <div class="formGrid">
+          <label>
+            Nombre
+            <input id="cName" placeholder="Ej: Connect / Dealer / Privado" />
+          </label>
+
+          <label>
+            Tarifa ($/milla)
+            <input id="cRate" inputmode="decimal" placeholder="Ej: 1.00" />
+          </label>
+
+          <label>
+            ¿Es Connect?
+            <select id="cConnect">
+              <option value="no">No</option>
+              <option value="yes">Sí</option>
+            </select>
+          </label>
+
+          <label>
+            Activo
+            <select id="cActive">
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+
+          <div class="full actions">
+            <button class="btn primary" id="btnSaveClient" type="button">Guardar</button>
+            <button class="btn" id="btnClearClient" type="button">Limpiar</button>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th class="num">Tarifa</th>
+                <th>Connect</th>
+                <th>Activo</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="clientsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         VIEW: ADMIN SERVICES
+    ========================== -->
+    <section class="view" id="view-adminServices">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Servicios (admin)</h2>
+          <div class="hint">Filtra • Export CSV • Borrar múltiple</div>
+        </div>
+
+        <div class="filters">
+          <label>
+            Semana (lunes)
+            <input type="date" id="sWeek" />
+          </label>
+
+          <label>
+            Chofer
+            <select id="sDriver"></select>
+          </label>
+
+          <label>
+            Cliente
+            <select id="sClient"></select>
+          </label>
+
+          <div class="actions">
+            <button class="btn primary" id="btnSvcFilter" type="button">Filtrar</button>
+            <button class="btn" id="btnSvcCSV" type="button">CSV</button>
+            <button class="btn danger" id="btnSvcDeleteMany" type="button">Borrar selección</button>
+          </div>
         </div>
 
         <div class="tableWrap">
           <table class="table">
             <thead>
               <tr>
+                <th></th>
                 <th>Fecha</th>
+                <th>Chofer</th>
                 <th>Cliente</th>
                 <th class="num">Millas</th>
                 <th class="num">Bruto</th>
-                <th class="num">Neto Chofer</th>
-                <th></th>
+                <th class="num">Adj</th>
+                <th class="num">Empresa</th>
+                <th class="num">Ret.</th>
+                <th class="num">Neto chofer</th>
+                <th>Acción</th>
               </tr>
             </thead>
-            <tbody id="dashRecent"></tbody>
+            <tbody id="servicesTable"></tbody>
           </table>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- =========================
-       DRIVER VIEW (Historial)
-  ========================= -->
-  <section class="view" id="view-driver">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Mi historial</h2>
-        <span class="hint">Solo lo tuyo. Nadie más.</span>
-      </div>
-
-      <div class="filters">
-        <label>Desde
-          <input type="date" id="drvFrom">
-        </label>
-        <label>Hasta
-          <input type="date" id="drvTo">
-        </label>
-        <label>Vista
-          <select id="drvGroup">
-            <option value="none">Detalle</option>
-            <option value="week">Por semana</option>
-            <option value="month">Por mes</option>
-          </select>
-        </label>
-
-        <button class="btn" id="btnDrvFilter">Filtrar</button>
-        <button class="btn primary" id="btnDrvPDF">PDF</button>
-      </div>
-
-      <div class="tableWrap">
-        <table class="table">
-          <thead id="drvHead"></thead>
-          <tbody id="drvBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- =========================
-       ADMIN: USERS
-  ========================= -->
-  <section class="view" id="view-adminUsers">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Usuarios</h2>
-        <span class="hint">Invita chofer por email (Google). Admin controla roles.</span>
-      </div>
-
-      <div class="formGrid">
-        <label>Email chofer
-          <input id="uEmail" placeholder="chofer@gmail.com">
-        </label>
-        <label>Rol
-          <select id="uRole">
-            <option value="driver">driver</option>
-            <option value="admin">admin</option>
-          </select>
-        </label>
-        <label>Activo
-          <select id="uActive">
-            <option value="true">Sí</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-        <label>Nota
-          <input id="uNote" placeholder="Opcional">
-        </label>
-        <div class="full actions">
-          <button class="btn primary" id="btnInviteUser">Invitar / Actualizar</button>
-          <button class="btn danger" id="btnResetPin">Reset PIN (seleccionado)</button>
+    <!-- =========================
+         VIEW: ADMIN CLOSE
+    ========================== -->
+    <section class="view" id="view-adminClose">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Cierre semanal (admin)</h2>
+          <div class="hint">Totales por chofer • PDF (jsPDF)</div>
         </div>
-        <div class="full hint">
-          * Invitación: el chofer entra con Google → el sistema lo autoriza por email → crea su user doc y luego crea PIN.
+
+        <div class="filters">
+          <label>
+            Semana (lunes)
+            <input type="date" id="wkStart" />
+          </label>
+
+          <label>
+            Chofer
+            <select id="wkDriver"></select>
+          </label>
+
+          <div class="actions">
+            <button class="btn primary" id="btnBuildWeekly" type="button">Generar</button>
+            <button class="btn" id="btnWeeklyPDF" type="button">PDF</button>
+          </div>
+        </div>
+
+        <div class="invoice" id="weeklyBox">
+          <div class="muted">—</div>
         </div>
       </div>
+    </section>
 
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Rol</th>
-              <th>Activo</th>
-              <th>UID</th>
-              <th>PIN</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="usersTable"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+    <!-- =========================
+         VIEW: ADMIN INVOICES
+    ========================== -->
+    <section class="view" id="view-adminInvoices">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Factura por cliente (admin)</h2>
+          <div class="hint">Semana • Cliente • PDF (jsPDF)</div>
+        </div>
 
-  <!-- =========================
-       ADMIN: CLIENTS
-  ========================= -->
-  <section class="view" id="view-adminClients">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Clientes</h2>
-        <span class="hint">Tarifa por milla + flag Connect</span>
-      </div>
+        <div class="filters">
+          <label>
+            Semana (lunes)
+            <input type="date" id="invWeek" />
+          </label>
 
-      <div class="formGrid">
-        <label>Nombre
-          <input id="cName" placeholder="Connect / Dealer / Privado...">
-        </label>
-        <label>Tarifa por milla ($)
-          <input id="cRate" type="number" step="0.01" min="0">
-        </label>
-        <label>Connect
-          <select id="cConnect">
-            <option value="no">No</option>
-            <option value="yes">Sí</option>
-          </select>
-        </label>
-        <label>Activo
-          <select id="cActive">
-            <option value="true">Sí</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-        <div class="full actions">
-          <button class="btn primary" id="btnSaveClient">Guardar</button>
-          <button class="btn" id="btnClearClient">Limpiar</button>
+          <label>
+            Cliente
+            <select id="invClient"></select>
+          </label>
+
+          <div class="actions">
+            <button class="btn primary" id="btnBuildInvoice" type="button">Generar</button>
+            <button class="btn" id="btnInvoicePDF" type="button">PDF</button>
+          </div>
+        </div>
+
+        <div class="invoice" id="invoiceBox">
+          <div class="muted">—</div>
         </div>
       </div>
+    </section>
 
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th class="num">Tarifa</th>
-              <th>Connect</th>
-              <th>Activo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="clientsTable"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- =========================
-       ADMIN: SERVICES
-  ========================= -->
-  <section class="view" id="view-adminServices">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Servicios</h2>
-        <span class="hint">Admin ve todo. Chofer NO.</span>
-      </div>
-
-      <div class="filters">
-        <label>Semana (lunes)
-          <input type="date" id="sWeek">
-        </label>
-        <label>Chofer
-          <select id="sDriver"></select>
-        </label>
-        <label>Cliente
-          <select id="sClient"></select>
-        </label>
-        <button class="btn" id="btnSvcFilter">Filtrar</button>
-        <button class="btn primary" id="btnSvcCSV">CSV</button>
-        <button class="btn danger" id="btnSvcDeleteMany">Borrar (selección)</button>
-      </div>
-
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Fecha</th>
-              <th>Chofer</th>
-              <th>Cliente</th>
-              <th class="num">Millas</th>
-              <th class="num">Bruto</th>
-              <th class="num">Adj Connect</th>
-              <th class="num">Empresa</th>
-              <th class="num">Retención</th>
-              <th class="num">Neto Chofer</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="servicesTable"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- =========================
-       ADMIN: CLOSE
-  ========================= -->
-  <section class="view" id="view-adminClose">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Cierres semanales</h2>
-        <span class="hint">Por chofer y global</span>
-      </div>
-
-      <div class="filters">
-        <label>Semana (lunes)
-          <input type="date" id="wkStart">
-        </label>
-        <label>Chofer
-          <select id="wkDriver"></select>
-        </label>
-        <button class="btn" id="btnBuildWeekly">Calcular</button>
-        <button class="btn primary" id="btnWeeklyPDF">PDF</button>
-      </div>
-
-      <div class="invoice" id="weeklyBox"></div>
-    </div>
-  </section>
-
-  <!-- =========================
-       ADMIN: INVOICES
-  ========================= -->
-  <section class="view" id="view-adminInvoices">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Facturar a terceros</h2>
-        <span class="hint">Por cliente (dealer, privado, Connect, etc.)</span>
-      </div>
-
-      <div class="filters">
-        <label>Semana (lunes)
-          <input type="date" id="invWeek">
-        </label>
-        <label>Cliente
-          <select id="invClient"></select>
-        </label>
-        <button class="btn" id="btnBuildInvoice">Construir</button>
-        <button class="btn primary" id="btnInvoicePDF">PDF</button>
-      </div>
-
-      <div class="invoice" id="invoiceBox"></div>
-    </div>
-  </section>
-
-  <!-- =========================
-       ADMIN: SETTINGS
-  ========================= -->
-  <section class="view" id="view-adminSettings">
-    <div class="card">
-      <div class="cardHead">
-        <h2>Settings</h2>
-        <span class="hint">No se borra al refresh</span>
-      </div>
-
-      <div class="formGrid">
-        <label>Nombre empresa
-          <input id="setBrand" placeholder="Nexus Transport PR">
-        </label>
-        <label>Connect % (ej 0.15)
-          <input id="setConnect" type="number" step="0.01" min="0">
-        </label>
-        <label>Empresa % (ej 0.30)
-          <input id="setCompany" type="number" step="0.01" min="0">
-        </label>
-        <label>Retención % (ej 0.10)
-          <input id="setRetention" type="number" step="0.01" min="0">
-        </label>
-        <label class="full">Footer PDF
-          <input id="setFooter" placeholder="Resumen generado...">
-        </label>
-
-        <div class="full actions">
-          <button class="btn primary" id="btnSaveSettings">Guardar</button>
-          <button class="btn danger" id="btnWipeCache">Limpiar cache local</button>
+    <!-- =========================
+         VIEW: ADMIN SETTINGS
+    ========================== -->
+    <section class="view" id="view-adminSettings">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Settings (admin)</h2>
+          <div class="hint">Persistente en Firestore (settings/global)</div>
         </div>
-        <div class="full hint">
-          * Settings viven en Firestore + cache local. Firestore manda.
+
+        <div class="formGrid">
+          <label class="full">
+            Brand / Nombre
+            <input id="setBrand" />
+          </label>
+
+          <label>
+            Connect % (0.15)
+            <input id="setConnect" inputmode="decimal" />
+          </label>
+
+          <label>
+            Empresa % (0.30)
+            <input id="setCompany" inputmode="decimal" />
+          </label>
+
+          <label>
+            Retención % (0.10)
+            <input id="setRetention" inputmode="decimal" />
+          </label>
+
+          <label class="full">
+            Footer (PDF)
+            <input id="setFooter" />
+          </label>
+
+          <div class="full actions">
+            <button class="btn primary" id="btnSaveSettings" type="button">Guardar settings</button>
+            <button class="btn" id="btnWipeCache" type="button">Limpiar cache local</button>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="muted">
+          Nota operacional: chofer **solo escribe** y ve su historial. Admin ve todo.
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-</main>
+  </main>
 
-<footer class="footer">
-  Nexus Transport PR · Operaciones de Grúas · Control por semana
-</footer>
+  <footer class="footer">
+    <div>© <span id="yearNow"></span> Nexus Transport PR</div>
+  </footer>
 
-<script src="app.js"></script>
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+
+  <script>
+    document.getElementById("yearNow").textContent = new Date().getFullYear();
+  </script>
+
 </body>
 </html>

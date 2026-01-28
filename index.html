@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TowOps Lite — Control de Choferes</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">TO</div>
+      <div>
+        <div class="brandName">TowOps Lite</div>
+        <div class="brandSub">Servicios • Millas • Cierre semanal • Facturación</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="tab" data-view="dashboard">Dashboard</button>
+      <button class="tab" data-view="drivers">Choferes</button>
+      <button class="tab" data-view="clients">Clientes</button>
+      <button class="tab" data-view="services">Servicios</button>
+      <button class="tab" data-view="weekly">Cierre semanal</button>
+      <button class="tab" data-view="settings">Ajustes</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- DASHBOARD -->
+    <section class="view" id="view-dashboard">
+      <div class="grid2">
+        <div class="card kpi">
+          <div class="kpiTitle">Ingresos semana (bruto)</div>
+          <div class="kpiValue" remember="kpiWeekGross">$0.00</div>
+          <div class="kpiSub" id="kpiWeekRange">—</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpiTitle">Total millas semana</div>
+          <div class="kpiValue" id="kpiWeekMiles">0</div>
+          <div class="kpiSub">Suma de millas registradas</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpiTitle">Servicios semana</div>
+          <div class="kpiValue" id="kpiWeekServices">0</div>
+          <div class="kpiSub">Conteo de servicios</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpiTitle">Ingreso por milla</div>
+          <div class="kpiValue" id="kpiRevPerMile">$0.00</div>
+          <div class="kpiSub">Bruto / millas</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardHead">
+          <h2>Nuevo servicio (rápido)</h2>
+          <span class="muted">30–60 segundos y pa’ lante</span>
+        </div>
+
+        <form id="quickServiceForm" class="formGrid">
+          <label>
+            Fecha
+            <input type="date" id="qsDate" required />
+          </label>
+
+          <label>
+            Chofer
+            <select id="qsDriver" required></select>
+          </label>
+
+          <label>
+            Cliente / Dealer
+            <select id="qsClient" required></select>
+          </label>
+
+          <label>
+            Tipo
+            <select id="qsType" required>
+              <option value="CONNECT">Connect</option>
+              <option value="AAA">AAA</option>
+              <option value="DEALER">Dealer</option>
+              <option value="PRIVADO">Privado</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </label>
+
+          <label>
+            Millas
+            <input type="number" id="qsMiles" step="0.1" min="0" required />
+          </label>
+
+          <label>
+            Monto ($)
+            <input type="number" id="qsAmount" step="0.01" min="0" required />
+          </label>
+
+          <label>
+            Método pago
+            <select id="qsPayMethod" required>
+              <option value="CASH">Cash</option>
+              <option value="ATH">ATH Móvil</option>
+              <option value="CREDITO">Crédito</option>
+              <option value="PENDIENTE">Pendiente</option>
+            </select>
+          </label>
+
+          <label>
+            Gastos ($)
+            <input type="number" id="qsExpenses" step="0.01" min="0" value="0" />
+          </label>
+
+          <label class="full">
+            Nota
+            <input type="text" id="qsNote" placeholder="Opcional (ej: radiobusto, motor, peaje…)" />
+          </label>
+
+          <div class="full actions">
+            <button class="btn primary" type="submit">Guardar servicio</button>
+            <button class="btn" type="button" id="seedDemo">Cargar demo</button>
+          </div>
+        </form>
+
+        <div class="hr"></div>
+
+        <div class="tableWrap">
+          <table class="table" id="dashRecentTable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Chofer</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th class="num">Millas</th>
+                <th class="num">Monto</th>
+                <th class="num">Gastos</th>
+                <th>Pago</th>
+                <th class="num">Connect -15%</th>
+                <th class="num">Neto chofer</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CHOFERES -->
+    <section class="view" id="view-drivers">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Choferes</h2>
+          <span class="muted">Alta rápida. Escalable para “muchos”.</span>
+        </div>
+
+        <form id="driverForm" class="formRow">
+          <input id="driverName" placeholder="Nombre chofer" required />
+          <input id="driverRate" type="number" step="0.01" min="0" placeholder="Tarifa $/milla (opcional)" />
+          <button class="btn primary" type="submit">Añadir</button>
+        </form>
+
+        <div class="tableWrap">
+          <table class="table" id="driversTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th class="num">Tarifa $/milla</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CLIENTES -->
+    <section class="view" id="view-clients">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Clientes / Dealers</h2>
+          <span class="muted">Aquí facturas a terceros.</span>
+        </div>
+
+        <form id="clientForm" class="formRow">
+          <input id="clientName" placeholder="Nombre cliente/dealer" required />
+          <input id="clientEmail" placeholder="Email (opcional)" />
+          <button class="btn primary" type="submit">Añadir</button>
+        </form>
+
+        <div class="tableWrap">
+          <table class="table" id="clientsTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SERVICIOS -->
+    <section class="view" id="view-services">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Servicios</h2>
+          <span class="muted">Filtro por semana, chofer, cliente.</span>
+        </div>
+
+        <div class="filters">
+          <label>Semana (lunes)
+            <input type="date" id="svcWeekStart" />
+          </label>
+          <label>Chofer
+            <select id="svcDriver"></select>
+          </label>
+          <label>Cliente
+            <select id="svcClient"></select>
+          </label>
+          <button class="btn" id="svcApply">Aplicar</button>
+          <button class="btn" id="svcExportCsv">Exportar CSV</button>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table" id="servicesTable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Chofer</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th class="num">Millas</th>
+                <th class="num">Monto</th>
+                <th class="num">Gastos</th>
+                <th>Pago</th>
+                <th class="num">Connect -15%</th>
+                <th class="num">Neto chofer</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CIERRE SEMANAL -->
+    <section class="view" id="view-weekly">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Cierre semanal</h2>
+          <span class="muted">Selecciona semana + chofer, genera liquidación y factura a terceros.</span>
+        </div>
+
+        <div class="filters">
+          <label>Semana (lunes)
+            <input type="date" id="wkStart" />
+          </label>
+
+          <label>Chofer
+            <select id="wkDriver"></select>
+          </label>
+
+          <label>Tarifa $/milla (si vacío usa ajuste global)
+            <input type="number" id="wkRate" step="0.01" min="0" placeholder="Ej: 2.50" />
+          </label>
+
+          <button class="btn primary" id="wkBuild">Generar cierre</button>
+          <button class="btn" id="wkPrint">Imprimir / Guardar PDF</button>
+        </div>
+
+        <div id="weeklySummary" class="invoice"></div>
+      </div>
+
+      <div class="card">
+        <div class="cardHead">
+          <h2>Facturar a cliente/dealer (tercero)</h2>
+          <span class="muted">Agrupa servicios por cliente para emitir factura.</span>
+        </div>
+
+        <div class="filters">
+          <label>Semana (lunes)
+            <input type="date" id="invWeekStart" />
+          </label>
+
+          <label>Cliente
+            <select id="invClient"></select>
+          </label>
+
+          <button class="btn primary" id="invBuild">Crear factura</button>
+          <button class="btn" id="invPrint">Imprimir / Guardar PDF</button>
+        </div>
+
+        <div id="invoiceClient" class="invoice"></div>
+      </div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <div class="cardHead">
+          <h2>Ajustes</h2>
+          <span class="muted">Reglas del negocio.</span>
+        </div>
+
+        <form id="settingsForm" class="formGrid">
+          <label>
+            Tarifa global $/milla (default)
+            <input type="number" id="setRate" step="0.01" min="0" />
+          </label>
+
+          <label>
+            Descuento Connect (0.15 = 15%)
+            <input type="number" id="setConnectPct" step="0.01" min="0" max="1" />
+          </label>
+
+          <label>
+            Nombre empresa
+            <input type="text" id="setBizName" />
+          </label>
+
+          <label class="full">
+            Nota pie de factura
+            <input type="text" id="setFooter" />
+          </label>
+
+          <div class="full actions">
+            <button class="btn primary" type="submit">Guardar ajustes</button>
+            <button class="btn danger" type="button" id="wipeAll">Borrar todo</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span class="muted">TowOps Lite • LocalStorage • GitHub Pages</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

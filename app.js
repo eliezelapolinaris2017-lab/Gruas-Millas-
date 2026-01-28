@@ -213,7 +213,8 @@
       adjEnBolsa,
       adjUsoCash,
       adjSeDebe,
-      driverFinal
+      driverFinal,
+      list // <- la lista para PDF detallado
     };
   }
 
@@ -521,8 +522,6 @@
     if ($("weeklySummary")) $("weeklySummary").innerHTML = html;
   });
 
-  $("wkPrint")?.addEventListener("click", () => window.print());
-
   // =========================
   // Invoice by client (facturar a terceros)
   // =========================
@@ -534,8 +533,7 @@
     const list = listWeek(wk, "", cid).slice().sort((a,b)=> (a.fecha < b.fecha ? 1 : -1));
     const bruto = round2(list.reduce((a,s)=>a+num(s.monto),0));
 
-    // Si el cliente es Connect (por nombre o tipo), aplicamos ajuste interno para “netear”
-    // Nota: si en tu operación Connect se factura por el bruto y luego ajusta, esto se puede cambiar.
+    // Si el cliente es Connect, aplicamos ajuste interno para “netear”
     const isConnect = (clientName(cid).toLowerCase() === "connect");
     const connectAdj = isConnect ? round2(bruto * num(settings.connectPct)) : 0;
     const neto = round2(bruto - connectAdj);
@@ -560,7 +558,185 @@
     if ($("invoiceClient")) $("invoiceClient").innerHTML = html;
   });
 
-  $("invPrint")?.addEventListener("click", () => window.print());
+  // =========================
+  // jsPDF: utilidades PDF (NO QUITA NADA, solo reemplaza print)
+  // =========================
+  function ensureJsPDF() {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      alert("Falta jsPDF. Añade el script CDN de jsPDF antes de app.js en el index.html.");
+      return null;
+    }
+    return window.jspdf.jsPDF;
+  }
+
+  function pdfNewDoc() {
+    const J = ensureJsPDF();
+    if (!J) return null;
+    const doc = new J({ unit: "pt", format: "letter" });
+    return doc;
+  }
+
+  function pdfText(doc, text, x, y, size = 11, bold = false) {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(size);
+    doc.text(String(text || ""), x, y);
+  }
+
+  function pdfLine(doc, x1, y1, x2, y2) {
+    doc.setLineWidth(0.8);
+    doc.line(x1, y1, x2, y2);
+  }
+
+  function pdfMoney(doc, label, value, xLabel, xValue, y) {
+    pdfText(doc, label, xLabel, y, 11, false);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(String(value), xValue, y, { align: "right" });
+  }
+
+  function pdfFooter(doc) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(settings.footer, 40, 750);
+  }
+
+  // =========================
+  // PDF: Cierre semanal (wkPrint) — SIEMPRE jsPDF
+  // =========================
+  $("wkPrint")?.addEventListener("click", () => {
+    const wk = $("wkStart")?.value;
+    const did = $("wkDriver")?.value;
+    if (!wk || !did) return alert("Selecciona semana y chofer.");
+
+    const r = calcWeekly(wk, did, getManualAdjustInputs());
+    const doc = pdfNewDoc();
+    if (!doc) return;
+
+    // Header
+    pdfText(doc, settings.companyName, 40, 50, 16, true);
+    pdfText(doc, "CIERRE SEMANAL (CHOFER)", 40, 72, 12, true);
+    pdfLine(doc, 40, 80, 572, 80);
+
+    // Meta
+    pdfText(doc, `Semana desde: ${wk}`, 40, 105, 11, false);
+    pdfText(doc, `Chofer: ${driverName(did)}`, 40, 123, 11, false);
+    pdfText(doc, `Servicios: ${r.count}`, 40, 141, 11, false);
+
+    // Totales
+    let y = 175;
+    pdfMoney(doc, "Millas", String(r.totalMiles), 40, 572, y); y += 18;
+    pdfMoney(doc, "Total Bruto", money(r.totalBruto), 40, 572, y); y += 18;
+    pdfMoney(doc, "Connect Bruto", money(r.connectBruto), 40, 572, y); y += 18;
+    pdfMoney(doc, `Ajuste Connect (-${Math.round(settings.connectPct * 100)}%)`, money(r.connectAdjust), 40, 572, y); y += 18;
+    pdfMoney(doc, "Total Neto (para reparto)", money(r.totalNeto), 40, 572, y); y += 24;
+
+    // Split
+    const driverPct = round2(1 - num(settings.companyPct));
+    pdfMoney(doc, `Empresa (${Math.round(settings.companyPct * 100)}%)`, money(r.companyShare), 40, 572, y); y += 18;
+    pdfMoney(doc, `Chofer (${Math.round(driverPct * 100)}%)`, money(r.driverShareGross), 40, 572, y); y += 18;
+    pdfMoney(doc, `Retención chofer (${Math.round(settings.retentionPct * 100)}%)`, `-${money(r.retention)}`, 40, 572, y); y += 18;
+    pdfMoney(doc, "Chofer Neto", money(r.driverShareNet), 40, 572, y); y += 24;
+
+    // Ajustes manuales
+    pdfText(doc, "AJUSTES", 40, y, 12, true); y += 14;
+    pdfLine(doc, 40, y, 572, y); y += 18;
+
+    pdfMoney(doc, "Gastos", `-${money(r.adjGastos)}`, 40, 572, y); y += 18;
+    pdfMoney(doc, "Peajes", `-${money(r.adjPeajes)}`, 40, 572, y); y += 18;
+    pdfMoney(doc, "Se le debe (±)", money(r.adjSeDebe), 40, 572, y); y += 24;
+
+    pdfText(doc, "TOTAL FINAL A PAGAR AL CHOFER", 40, y, 12, true);
+    pdfText(doc, money(r.driverFinal), 572, y, 14, true);
+    doc.text("", 0, 0); // no-op
+
+    // Detalle (mini lista)
+    y += 26;
+    pdfText(doc, "DETALLE DE SERVICIOS (resumen)", 40, y, 11, true); y += 14;
+    pdfLine(doc, 40, y, 572, y); y += 16;
+
+    // Render lineas sin autoTable (simple y estable)
+    const maxLines = 18;
+    const detail = r.list.slice().sort((a,b)=> (a.fecha > b.fecha ? 1 : -1)).slice(0, maxLines);
+
+    detail.forEach((s) => {
+      const line = `${s.fecha} • ${clientName(s.clientId)} • ${s.tipo} • ${round2(s.millas)} mi • ${money(s.monto)}`;
+      pdfText(doc, line, 40, y, 10, false);
+      y += 14;
+    });
+
+    if (r.list.length > maxLines) {
+      pdfText(doc, `… +${r.list.length - maxLines} más`, 40, y, 10, false);
+    }
+
+    pdfFooter(doc);
+
+    const safeName = driverName(did).replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
+    doc.save(`Cierre_${safeName}_${wk}.pdf`);
+  });
+
+  // =========================
+  // PDF: Factura por cliente (invPrint) — SIEMPRE jsPDF
+  // =========================
+  $("invPrint")?.addEventListener("click", () => {
+    const wk = $("invWeekStart")?.value;
+    const cid = $("invClient")?.value;
+    if (!wk || !cid) return alert("Selecciona semana y cliente.");
+
+    const list = listWeek(wk, "", cid).slice().sort((a,b)=> (a.fecha < b.fecha ? 1 : -1));
+    const bruto = round2(list.reduce((a,s)=>a+num(s.monto),0));
+
+    const isConnect = (clientName(cid).toLowerCase() === "connect");
+    const connectAdj = isConnect ? round2(bruto * num(settings.connectPct)) : 0;
+    const neto = round2(bruto - connectAdj);
+
+    const doc = pdfNewDoc();
+    if (!doc) return;
+
+    // Header
+    pdfText(doc, settings.companyName, 40, 50, 16, true);
+    pdfText(doc, "FACTURA POR CLIENTE", 40, 72, 12, true);
+    pdfLine(doc, 40, 80, 572, 80);
+
+    pdfText(doc, `Semana desde: ${wk}`, 40, 105, 11, false);
+    pdfText(doc, `Cliente: ${clientName(cid)}`, 40, 123, 11, false);
+
+    let y = 155;
+    pdfText(doc, "DETALLE", 40, y, 11, true); y += 12;
+    pdfLine(doc, 40, y, 572, y); y += 16;
+
+    // detalle lineal
+    const maxLines = 26;
+    const items = list.slice(0, maxLines);
+    items.forEach((s) => {
+      const line = `${s.fecha} • ${driverName(s.driverId)} • ${s.tipo} • ${round2(s.millas)} mi`;
+      pdfText(doc, line, 40, y, 10, false);
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(10);
+      doc.text(money(s.monto), 572, y, { align: "right" });
+      y += 14;
+    });
+
+    if (list.length > maxLines) {
+      pdfText(doc, `… +${list.length - maxLines} más`, 40, y, 10, false);
+      y += 16;
+    } else {
+      y += 8;
+    }
+
+    pdfLine(doc, 40, y, 572, y); y += 18;
+
+    pdfMoney(doc, "Total Bruto", money(bruto), 40, 572, y); y += 18;
+    if (isConnect) {
+      pdfMoney(doc, `Ajuste Connect (-${Math.round(settings.connectPct * 100)}%)`, `-${money(connectAdj)}`, 40, 572, y);
+      y += 18;
+    }
+    pdfMoney(doc, "Total a facturar", money(neto), 40, 572, y);
+
+    pdfFooter(doc);
+
+    const safeClient = clientName(cid).replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
+    doc.save(`Factura_${safeClient}_${wk}.pdf`);
+  });
 
   // =========================
   // Settings form (persistente)

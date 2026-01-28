@@ -21,13 +21,13 @@
      0) Firebase Config (TUYO)
   ========================= */
   const firebaseConfig = {
-    apiKey: "AIzaSyAouzcePuYPfGBajbqFFotTNNr_gx_XCYQ",
-    authDomain: "nexus-auto-pro-2026.firebaseapp.com",
-    projectId: "nexus-auto-pro-2026",
-    storageBucket: "nexus-auto-pro-2026.firebasestorage.app",
-    messagingSenderId: "308014641424",
-    appId: "1:308014641424:web:edf18eb89168f9b5eeb595"
-  };
+    apiKey: "AIzaSyDGoSNKi1wapE1SpHxTc8wNZGGkJ2nQj7s",
+  authDomain: "nexus-transport-2887b.firebaseapp.com",
+  projectId: "nexus-transport-2887b",
+  storageBucket: "nexus-transport-2887b.firebasestorage.app",
+  messagingSenderId: "972915419764",
+  appId: "1:972915419764:web:7d61dfb03bbe56df867f21"
+};
 
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();

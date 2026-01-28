@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Nexus Transport PR</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- Firebase v8 (compatible con tu app.js) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+
+<!-- ================= TOPBAR ================= -->
+<header class="topbar" id="topbar" hidden>
+  <div class="brand">
+    <div class="logo">NT</div>
+    <div>
+      <div class="brandName">Nexus Transport PR</div>
+      <div class="brandSub" id="whoLine">—</div>
+    </div>
+  </div>
+
+  <div class="nav" id="navTabs">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="driver">Chofer</button>
+
+    <button class="tab" id="tabAdminUsers" data-view="adminUsers">Usuarios</button>
+    <button class="tab" id="tabAdminClients" data-view="adminClients">Clientes</button>
+    <button class="tab" id="tabAdminServices" data-view="adminServices">Servicios</button>
+  </div>
+
+  <div class="actions">
+    <span class="pill" id="rolePill">—</span>
+    <button class="btn" id="btnReload">Recargar</button>
+    <button class="btn danger" id="btnLogout">Salir</button>
+  </div>
+</header>
+
+<!-- ================= APP ================= -->
+<main class="container" id="app" hidden>
+
+  <!-- ===== LOGIN ===== -->
+  <section class="view active" id="view-login">
+    <div class="card">
+      <h2>Acceso</h2>
+      <p id="loginMsg" class="muted">Inicia sesión con Google</p>
+
+      <button class="btnXL primary" id="btnGoogleLogin">
+        Entrar con Google
+      </button>
+
+      <div class="hr"></div>
+
+      <label>PIN</label>
+      <input id="pinInput" type="password"/>
+      <div class="error" id="pinError"></div>
+      <button class="btn primary" id="btnPinConfirm">Confirmar PIN</button>
+
+      <div class="hr"></div>
+
+      <label>Crear PIN</label>
+      <input id="pinNew" type="password" placeholder="Nuevo PIN"/>
+      <input id="pinNew2" type="password" placeholder="Confirmar PIN"/>
+      <div class="error" id="pinSetError"></div>
+      <button class="btn" id="btnPinSet">Guardar PIN</button>
+    </div>
+  </section>
+
+  <!-- ===== DASHBOARD ===== -->
+  <section class="view" id="view-dashboard">
+    <div class="grid2">
+      <div class="card">
+        <div class="kpiTitle">Millas semana</div>
+        <div class="kpiValue" id="kpiWeekMiles">0</div>
+      </div>
+      <div class="card">
+        <div class="kpiTitle">Servicios</div>
+        <div class="kpiValue" id="kpiWeekServices">0</div>
+      </div>
+      <div class="card">
+        <div class="kpiTitle">Neto Chofer</div>
+        <div class="kpiValue" id="kpiWeekDriverNet">$0.00</div>
+      </div>
+      <div class="card">
+        <div class="kpiTitle">Empresa</div>
+        <div class="kpiValue" id="kpiWeekCompany">$0.00</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Últimos servicios</h2>
+      <div class="tableWrap">
+        <table class="table">
+          <tbody id="dashRecent"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DRIVER ===== -->
+  <section class="view" id="view-driver">
+    <div class="card">
+      <h2>Historial Chofer</h2>
+
+      <div class="formRow">
+        <input type="date" id="drvFrom"/>
+        <input type="date" id="drvTo"/>
+        <select id="drvGroup">
+          <option value="none">Detalle</option>
+          <option value="week">Por semana</option>
+          <option value="month">Por mes</option>
+        </select>
+        <button class="btn primary" id="btnDrvFilter">Filtrar</button>
+        <button class="btn" id="btnDrvPDF">PDF</button>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table">
+          <thead id="drvHead"></thead>
+          <tbody id="drvBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ADMIN USERS ===== -->
+  <section class="view" id="view-adminUsers">
+    <div class="card">
+      <h2>Usuarios</h2>
+      <div class="tableWrap">
+        <table class="table">
+          <tbody id="usersTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ADMIN CLIENTS ===== -->
+  <section class="view" id="view-adminClients">
+    <div class="card">
+      <h2>Clientes</h2>
+      <div class="tableWrap">
+        <table class="table">
+          <tbody id="clientsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ADMIN SERVICES ===== -->
+  <section class="view" id="view-adminServices">
+    <div class="card">
+      <h2>Servicios</h2>
+      <button class="btn" id="btnSvcFilter">Actualizar</button>
+      <div class="tableWrap">
+        <table class="table">
+          <tbody id="servicesTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  © 2026 Nexus Transport PR
+</footer>
+
+<!-- APP -->
+<script src="app.js"></script>
+
+</body>
+</html>

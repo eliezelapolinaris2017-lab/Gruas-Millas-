@@ -170,12 +170,6 @@ function weekRangeThuToThu(dateStr) {
   };
 }
 
-/* ========== DOM (IDs del index que ya tienes) ========= */
-// Screens
-const pinScreen = document.getElementById("pinScreen");
-const authScreen = document.getElementById("authScreen");
-const appShell = document.getElementById("appShell");
-
 // PIN admin/driver
 const pinInput = document.getElementById("pinInput");
 const pinEnterBtn = document.getElementById("pinEnterBtn");

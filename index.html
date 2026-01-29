@@ -6,7 +6,7 @@
   <title>Nexus Transport — Cuadres</title>
   <meta name="description" content="Nexus Transport — Sistema de servicios, millas y cuadres sincronizado con Firebase.">
 
-  <!-- PWA (rutas relativas para GitHub Pages) -->
+  <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b0b0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -37,7 +37,6 @@
       <!-- ADMIN -->
       <label class="field-label" for="pinInput">PIN ADMIN (maestro)</label>
       <input id="pinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
-
       <div class="form-actions" style="margin-top:10px;">
         <button id="pinEnterBtn" class="btn btn-primary">Entrar Admin</button>
       </div>
@@ -120,19 +119,26 @@
           <div class="grid-2">
             <div class="field-group">
               <label class="field-label">Número</label>
+              <!-- Compat: algunos scripts usan serviceNumber, otros ticketNumber -->
               <input id="serviceNumber" type="text" class="field-input" readonly />
+              <input id="ticketNumber" type="text" class="field-input hidden" readonly />
             </div>
             <div class="field-group">
               <label class="field-label">Fecha</label>
               <input id="serviceDate" type="date" class="field-input" />
+              <input id="ticketDate" type="date" class="field-input hidden" />
             </div>
           </div>
 
           <div class="grid-2">
             <div class="field-group">
               <label class="field-label">Chofer</label>
+              <!-- Compat: driver / technician -->
               <select id="driver" class="field-input"></select>
+              <select id="technician" class="field-input hidden"></select>
+
               <input id="driverCustom" type="text" class="field-input mt-4" placeholder="Otro chofer (solo admin)" />
+              <input id="technicianCustom" type="text" class="field-input mt-4 hidden" placeholder="Otra técnica (solo admin)" />
             </div>
 
             <div class="field-group">
@@ -157,7 +163,8 @@
 
           <div class="grid-2">
             <div class="field-group">
-              <label class="field-label">Categoría (según tu hoja)</label>
+              <label class="field-label">Categoría</label>
+              <!-- Compat: category / serviceDesc -->
               <select id="category" class="field-input">
                 <option value="">Seleccionar...</option>
                 <option value="Connect">Connect</option>
@@ -180,36 +187,50 @@
                 <option value="Se le Debe">Se le Debe</option>
                 <option value="Otro">Otro</option>
               </select>
+
+              <input id="serviceDesc" type="text" class="field-input hidden" placeholder="Servicio" />
             </div>
 
             <div class="field-group">
               <label class="field-label">Monto ($)</label>
+              <!-- Compat: amount / unitPrice / totalAmount -->
               <input id="amount" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
-              <p class="msg-info small">Si es gasto, usa monto positivo (ej: 290.00). El resumen lo cuadrará.</p>
+              <input id="unitPrice" type="number" min="0" step="0.01" class="field-input hidden" />
+              <input id="totalAmount" type="number" class="field-input hidden" readonly />
+              <p class="msg-info small">Si es gasto, usa monto positivo. El resumen lo cuadrará.</p>
             </div>
           </div>
 
           <div class="grid-2">
             <div class="field-group">
-              <label class="field-label">Millas (SIEMPRE manual)</label>
+              <label class="field-label">Millas (manual)</label>
               <input id="miles" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
               <p class="msg-info small">Connect y NO Connect: aquí siempre se registran las millas.</p>
             </div>
 
             <div class="field-group">
               <label class="field-label">Descripción (opcional)</label>
-              <input id="description" type="text" class="field-input" placeholder="Ej. Centro Toyota RP → Brawlio..." />
+              <input id="description" type="text" class="field-input" placeholder="Ej. Centro Toyota RP → ..." />
+              <input id="clientName" type="text" class="field-input hidden" placeholder="Cliente (compat)" />
             </div>
           </div>
 
           <div class="field-group">
             <label class="field-label">Notas (opcional)</label>
-            <input id="notes" type="text" class="field-input" placeholder="Cualquier detalle: cheque, turno, etc." />
+            <input id="notes" type="text" class="field-input" placeholder="Detalles: cheque, turno, etc." />
           </div>
+
+          <!-- Compat con scripts que calculan qty/tip -->
+          <input id="quantity" class="hidden" type="number" value="1" />
+          <input id="tipAmount" class="hidden" type="number" value="0" />
 
           <div class="form-actions">
             <button id="newServiceBtn" class="btn btn-secondary">Nuevo</button>
             <button id="saveServiceBtn" class="btn btn-primary">Guardar</button>
+
+            <!-- Compat: scripts viejos -->
+            <button id="newTicketBtn" class="btn btn-secondary hidden">Nuevo ticket</button>
+            <button id="saveTicketBtn" class="btn btn-primary hidden">Guardar ticket</button>
           </div>
 
           <p id="formMessage" class="msg-info"></p>
@@ -222,6 +243,7 @@
           <div class="panel-header">
             <h2>Historial</h2>
             <div class="panel-header-actions nav-admin">
+              <button id="exportPdfBtn" class="btn btn-outline hidden">Exportar PDF</button>
               <button id="backupJsonBtn" class="btn btn-outline">Backup JSON</button>
             </div>
           </div>
@@ -235,10 +257,14 @@
               <label>Hasta</label>
               <input id="filterEnd" type="date" class="field-input small">
             </div>
+
+            <!-- Compat: filterDriver / filterTech -->
             <div class="filter-group nav-admin">
               <label>Chofer</label>
               <select id="filterDriver" class="field-input small"></select>
+              <select id="filterTech" class="field-input small hidden"></select>
             </div>
+
             <div class="filter-group">
               <label>Categoría</label>
               <select id="filterCategory" class="field-input small">
@@ -264,6 +290,7 @@
                 <option value="Otro">Otro</option>
               </select>
             </div>
+
             <div class="filter-group filter-actions">
               <button id="applyFilterBtn" class="btn btn-small btn-primary">Filtrar</button>
               <button id="clearFilterBtn" class="btn btn-small btn-text">Limpiar</button>
@@ -286,12 +313,15 @@
                 </tr>
               </thead>
               <tbody id="servicesTableBody"></tbody>
+
+              <!-- Compat: scripts viejos -->
+              <tbody id="ticketsTableBody" class="hidden"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- ================= CAJA (ADMIN) ================= -->
+      <!-- ================= CAJA ================= -->
       <section id="page-caja" class="page">
         <div class="panel wide">
           <div class="panel-header">
@@ -339,7 +369,7 @@
         </div>
       </section>
 
-      <!-- ================= RESUMEN (ADMIN) ================= -->
+      <!-- ================= RESUMEN ================= -->
       <section id="page-resumen" class="page">
         <div class="panel wide">
           <div class="panel-header">
@@ -389,14 +419,12 @@
         </div>
       </section>
 
-      <!-- ================= COMISIONES (ADMIN) ================= -->
+      <!-- ================= COMISIONES ================= -->
       <section id="page-comisiones" class="page">
         <div class="panel wide">
           <div class="panel-header">
             <h2>Comisiones</h2>
-            <p class="panel-subtitle">
-              Calcula: Descuento (% chofer) + Retención (%). Neto = Descuento - Retención.
-            </p>
+            <p class="panel-subtitle">Neto = Descuento - Retención</p>
           </div>
 
           <div class="filters-row">
@@ -439,24 +467,48 @@
             <div class="caja-card total">
               <h3>Neto total</h3>
               <p id="comiGrandTotal" class="caja-amount">$0.00</p>
-              <span class="caja-badge">Suma neta del filtro actual</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ================= CONFIG (ADMIN) ================= -->
+      <!-- ================= CONFIG ================= -->
       <section id="page-config" class="page">
         <div class="panel wide">
           <h2>Configuración</h2>
 
+          <!-- Compat Branding -->
           <div class="grid-2">
             <div class="field-group">
-              <label class="field-label">Texto footer</label>
-              <input id="footerTextInput" type="text" class="field-input" value="© 2026 Nexus Transport — Cuadres" />
-              <p class="msg-info small">Se refleja abajo en la app.</p>
+              <label class="field-label">URL Logo (opcional)</label>
+              <input id="logoUrlInput" type="text" class="field-input" placeholder="https://...logo.png">
+              <p class="msg-info small">Si está vacío usa assets/logo.png</p>
             </div>
 
+            <div class="field-group">
+              <label class="field-label">Guardar Config en la nube</label>
+              <button id="saveBrandingBtn" class="btn btn-outline">Guardar en Firebase</button>
+              <p id="brandingStatus" class="msg-info small"></p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Texto Header PDF (opcional)</label>
+              <textarea id="pdfHeaderText" rows="3" class="field-input" placeholder="Encabezado PDF..."></textarea>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Texto Footer PDF (opcional)</label>
+              <textarea id="pdfFooterText" rows="3" class="field-input" placeholder="Pie PDF..."></textarea>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Texto footer</label>
+            <input id="footerTextInput" type="text" class="field-input" value="© 2026 Nexus Transport — Cuadres" />
+          </div>
+
+          <div class="grid-2">
             <div class="field-group">
               <label class="field-label">Cambiar PIN Admin</label>
               <div class="grid-2">
@@ -464,20 +516,6 @@
                 <button id="changePinBtn" class="btn btn-outline">Guardar PIN</button>
               </div>
               <p id="pinChangeMessage" class="msg-info small"></p>
-            </div>
-          </div>
-
-          <div class="grid-3">
-            <div class="field-group">
-              <label class="field-label">% Descuento Default (chofer)</label>
-              <input id="defaultRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="30" />
-              <p class="msg-info small">Ej: 30% (0.30) en tu hoja.</p>
-            </div>
-
-            <div class="field-group">
-              <label class="field-label">% Retención Default</label>
-              <input id="retentionRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="10" />
-              <p class="msg-info small">Ej: 10% en tu hoja.</p>
             </div>
 
             <div class="field-group">
@@ -490,9 +528,24 @@
             </div>
           </div>
 
+          <div class="grid-3">
+            <div class="field-group">
+              <label class="field-label">% Descuento Default (chofer)</label>
+              <input id="defaultRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="30" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">% Retención Default</label>
+              <input id="retentionRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="10" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Guardar settings local</label>
+              <button id="saveSettingsBtn" class="btn btn-primary">Guardar Settings</button>
+              <p id="settingsStatus" class="msg-info small"></p>
+            </div>
+          </div>
+
           <hr class="hr-soft">
 
-          <!-- ADMIN AREA -->
           <div id="adminArea" class="field-group">
             <h3>Choferes (Nombre + PIN + %)</h3>
             <p class="msg-info small">Crea choferes, asigna su PIN y % de descuento/comisión.</p>

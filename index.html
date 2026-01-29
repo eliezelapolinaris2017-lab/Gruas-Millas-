@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Nexus Transport — Cuadres</title>
+  <meta name="description" content="Nexus Transport — Cuadre semanal por chofer (Jueves a Jueves) con Firebase.">
+
+  <!-- PWA (rutas relativas para GitHub Pages) -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Nexus Transport" />
+  <link rel="apple-touch-icon" href="./assets/logo.png" />
+  <link rel="icon" type="image/png" href="./assets/logo.png" />
+
+  <link rel="stylesheet" href="./styles.css?v=1" />
+</head>
+<body>
+
+  <!-- ============== PANTALLA PIN ============== -->
+  <div id="pinScreen" class="view view-centered">
+    <div class="card card-pin">
+      <div class="brand-header">
+        <div class="brand-logo-wrap">
+          <img id="pinLogo" src="./assets/logo.png" alt="Logo" class="brand-logo">
+        </div>
+        <div class="brand-text-wrap">
+          <h1 id="pinAppName">Nexus Transport</h1>
+          <p>Acceso protegido por PIN</p>
+        </div>
+      </div>
+
+      <!-- ADMIN -->
+      <label class="field-label" for="pinInput">PIN ADMIN (maestro)</label>
+      <input id="pinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
+      <div class="form-actions" style="margin-top:10px;">
+        <button id="pinEnterBtn" class="btn btn-primary">Entrar Admin</button>
+      </div>
+
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.08);margin:14px 0;">
+
+      <!-- EMPLEADO -->
+      <label class="field-label" for="empNameInput">Nombre (chofer)</label>
+      <input id="empNameInput" type="text" class="field-input" placeholder="Ej. Adolfo" autocomplete="off" />
+
+      <label class="field-label" for="empPinInput" style="margin-top:10px;">PIN (chofer)</label>
+      <input id="empPinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
+
+      <div class="form-actions" style="margin-top:10px;">
+        <button id="empEnterBtn" class="btn btn-secondary">Entrar Chofer</button>
+      </div>
+
+      <p id="pinError" class="msg-error"></p>
+    </div>
+  </div>
+
+  <!-- ============== PANTALLA AUTH ============== -->
+  <div id="authScreen" class="view view-centered hidden">
+    <div class="card card-auth">
+      <h2>Conectar con Google</h2>
+      <p>Inicia sesión con Google para sincronizar los servicios en todos los dispositivos.</p>
+      <button id="googleSignInBtn" class="btn btn-google">Conectar con Google</button>
+      <button id="authBackToPinBtn" class="btn btn-text">Volver al PIN</button>
+      <p class="msg-info small">* Recomendado: usa una cuenta de Google del negocio.</p>
+    </div>
+  </div>
+
+  <!-- ============== APP ============== -->
+  <div id="appShell" class="view hidden">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-inline">
+          <div class="brand-logo-wrap small">
+            <img id="appLogo" src="./assets/logo.png" alt="Nexus Transport" class="brand-logo">
+          </div>
+          <div class="brand-text-wrap">
+            <div class="app-name-row">
+              <span id="appNameEditable" contenteditable="true" class="app-name">Nexus Transport</span>
+            </div>
+            <small class="app-subtitle" id="sessionSubtitle">Cuadre semanal por chofer (Jueves → Jueves)</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <button data-page="dashboard" class="nav-btn nav-btn-active">Dashboard</button>
+        <button data-page="historial" class="nav-btn">Historial</button>
+        <button data-page="cuadre" class="nav-btn">Cuadre</button>
+        <button data-page="config" class="nav-btn nav-admin">Configuración</button>
+      </div>
+
+      <div class="topbar-right">
+        <div class="user-info">
+          <span id="userEmail" class="user-email">Sin conexión a Google</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="logoutBtn" class="btn btn-danger">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout-main">
+
+      <!-- ====== DASHBOARD ====== -->
+      <section id="page-dashboard" class="page active-page">
+        <div class="panel panel-form wide">
+          <h2>Nuevo servicio</h2>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label class="field-label"># Servicio</label>
+              <input id="ticketNumber" type="text" class="field-input" readonly />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Fecha</label>
+              <input id="ticketDate" type="date" class="field-input" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Chofer</label>
+              <select id="driverSelect" class="field-input"></select>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Categoría (según tu hoja)</label>
+              <select id="category" class="field-input">
+                <option value="">Seleccionar...</option>
+                <option value="CONNECT">Connect (millas/enganche/viales)</option>
+                <option value="COPS">COPS</option>
+                <option value="AAA">AAA</option>
+                <option value="ENTERPRISE">Enterprise</option>
+                <option value="MAPFRE">Mapfre</option>
+                <option value="CREDITOS">Créditos (privados/clientes)</option>
+                <option value="ERIKA_CODE_POLA">Erika (AAA / Code Pola)</option>
+                <option value="ATH_MOVIL">ATH Móvil</option>
+                <option value="SALVAMENTOS">Salvamentos</option>
+                <option value="OD_CONNECT">OD (Connect)</option>
+                <option value="EXTRACCIONES">Extracciones</option>
+                <option value="PAGINA">Página</option>
+                <option value="VIALES_SOLO">Viales (solo)</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Método</label>
+              <select id="paymentMethod" class="field-input">
+                <option value="">Seleccionar...</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="ATH Móvil">ATH Móvil</option>
+                <option value="Crédito">Crédito</option>
+                <option value="Compañía">Compañía</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="connectBlock" class="panel" style="margin-top:10px;">
+            <h3>Connect (cálculo automático)</h3>
+            <p class="msg-info small">
+              Total Connect Grua = (Millas × Tarifa por milla) + Enganche + Viales.<br>
+              –15% Connect = Total Connect Grua × 0.85.
+            </p>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Millas</label>
+                <input id="miles" type="number" step="0.01" min="0" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Enganche (Connect)</label>
+                <input id="enganche" type="number" step="0.01" min="0" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Viales (Connect)</label>
+                <input id="viales" type="number" step="0.01" min="0" class="field-input" placeholder="0.00" />
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Tarifa por milla (config)</label>
+                <input id="ratePerMile" type="number" step="0.01" min="0" class="field-input" readonly />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Total Connect Grua</label>
+                <input id="totalConnectGrua" type="number" class="field-input" readonly />
+              </div>
+              <div class="field-group">
+                <label class="field-label">–15% Connect</label>
+                <input id="minus15Connect" type="number" class="field-input" readonly />
+              </div>
+            </div>
+          </div>
+
+          <div id="amountBlock" class="grid-2" style="margin-top:10px;">
+            <div class="field-group">
+              <label class="field-label">Descripción (opcional)</label>
+              <input id="serviceDesc" type="text" class="field-input" placeholder="Ej. Centro Toyota RP → Brawlio..." />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Monto del servicio (si NO es Connect)</label>
+              <input id="amount" type="number" step="0.01" min="0" class="field-input" placeholder="0.00" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="newTicketBtn" class="btn btn-secondary">Nuevo</button>
+            <button id="saveTicketBtn" class="btn btn-primary">Guardar</button>
+          </div>
+
+          <p id="formMessage" class="msg-info"></p>
+        </div>
+      </section>
+
+      <!-- ====== HISTORIAL ====== -->
+      <section id="page-historial" class="page">
+        <div class="panel panel-history wide">
+          <div class="panel-header">
+            <h2>Historial</h2>
+            <div class="panel-header-actions nav-admin">
+              <button id="backupJsonBtn" class="btn btn-outline">Backup JSON</button>
+            </div>
+          </div>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label>Desde</label>
+              <input id="filterStart" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Hasta</label>
+              <input id="filterEnd" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Chofer</label>
+              <select id="filterDriver" class="field-input small"></select>
+            </div>
+            <div class="filter-group">
+              <label>Categoría</label>
+              <select id="filterCategory" class="field-input small">
+                <option value="">Todas</option>
+                <option value="CONNECT">CONNECT</option>
+                <option value="COPS">COPS</option>
+                <option value="AAA">AAA</option>
+                <option value="ENTERPRISE">ENTERPRISE</option>
+                <option value="MAPFRE">MAPFRE</option>
+                <option value="CREDITOS">CREDITOS</option>
+                <option value="ERIKA_CODE_POLA">ERIKA_CODE_POLA</option>
+                <option value="ATH_MOVIL">ATH_MOVIL</option>
+                <option value="SALVAMENTOS">SALVAMENTOS</option>
+                <option value="OD_CONNECT">OD_CONNECT</option>
+                <option value="EXTRACCIONES">EXTRACCIONES</option>
+                <option value="PAGINA">PAGINA</option>
+                <option value="VIALES_SOLO">VIALES_SOLO</option>
+              </select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="applyFilterBtn" class="btn btn-small btn-primary">Filtrar</button>
+              <button id="clearFilterBtn" class="btn btn-small btn-text">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Chofer</th>
+                  <th>Categoría</th>
+                  <th>Millas</th>
+                  <th>Método</th>
+                  <th>Monto</th>
+                  <th class="nav-admin">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="ticketsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== CUADRE (JUEVES A JUEVES) ====== -->
+      <section id="page-cuadre" class="page">
+        <div class="panel wide">
+          <div class="panel-header">
+            <div>
+              <h2>Cuadre semanal (Jueves → Jueves)</h2>
+              <p class="panel-subtitle">
+                Fórmulas según tu hoja:
+                <strong>Descuento .30</strong> = Total × 0.30 |
+                <strong>Retención 10%</strong> = Descuento × 0.10 |
+                <strong>Total a pagar</strong> = Descuento − Retención
+              </p>
+            </div>
+          </div>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label>Chofer</label>
+              <select id="cuadreDriver" class="field-input small"></select>
+            </div>
+            <div class="filter-group">
+              <label>Semana (Jueves)</label>
+              <input id="cuadreThursday" type="date" class="field-input small">
+              <p class="msg-info small">Escoge cualquier fecha dentro de la semana; se ajusta a Jueves automáticamente.</p>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="cuadreApplyBtn" class="btn btn-small btn-primary">Calcular</button>
+              <button id="cuadreThisWeekBtn" class="btn btn-small btn-text">Esta semana</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="cuadreTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="panel" style="margin-top:12px;">
+            <h3>Cash / Gastos (tiene que cuadrar)</h3>
+            <p class="msg-info small">
+              Cash recibido = Cash en recibo + Cash que trae el chofer.<br>
+              Cash neto = Cash recibido − Gastos − Uso del cash − Pago peaje − Se le debe.<br>
+              Diferencia = (Cash neto) − En bolsa (declarado).
+            </p>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Cash en recibo</label>
+                <input id="cashRecibo" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Cash que trae chofer</label>
+                <input id="cashChofer" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Gastos</label>
+                <input id="gastos" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Uso del cash</label>
+                <input id="usoCash" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Pago peaje</label>
+                <input id="pagoPeaje" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Se le debe</label>
+                <input id="seDebe" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field-group">
+                <label class="field-label">En bolsa (declarado)</label>
+                <input id="enBolsa" type="number" step="0.01" class="field-input" placeholder="0.00" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Resultado</label>
+                <input id="cashResult" type="text" class="field-input" readonly />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button id="cashCalcBtn" class="btn btn-outline">Calcular Cash</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====== CONFIG (ADMIN) ====== -->
+      <section id="page-config" class="page">
+        <div class="panel wide">
+          <h2>Configuración</h2>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Tarifa por milla (Connect)</label>
+              <input id="configRatePerMile" type="number" step="0.01" min="0" class="field-input" placeholder="Ej. 4.00">
+              <p class="msg-info small">Se usa para: Total Connect Grua = Millas × Tarifa + Enganche + Viales.</p>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Cambiar PIN ADMIN (maestro)</label>
+              <div class="grid-2">
+                <input id="newPinInput" type="password" maxlength="6" class="field-input" placeholder="Nuevo PIN" />
+                <button id="changePinBtn" class="btn btn-outline">Guardar PIN</button>
+              </div>
+              <p id="pinChangeMessage" class="msg-info small"></p>
+            </div>
+          </div>
+
+          <div id="adminArea" class="field-group">
+            <h3>Choferes (Nombre + PIN)</h3>
+            <p class="msg-info small">El chofer entra con Nombre + PIN (local). Google se usa para sincronizar.</p>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Nombre (chofer)</label>
+                <input id="staffNameInput" type="text" class="field-input" placeholder="Ej. Adolfo">
+              </div>
+              <div class="field-group">
+                <label class="field-label">PIN chofer</label>
+                <input id="staffPinInput" type="password" maxlength="6" class="field-input" placeholder="1234">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Activo</label>
+                <select id="staffActiveInput" class="field-input">
+                  <option value="true">Sí</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button id="addStaffBtn" class="btn btn-primary">Añadir / Actualizar</button>
+              <button id="resetStaffBtn" class="btn btn-text">Limpiar</button>
+            </div>
+
+            <div class="table-wrap" style="margin-top:12px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Chofer</th>
+                    <th>PIN</th>
+                    <th>Activo</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <span id="footerText">© 2026 Nexus Transport — Cuadres</span>
+    </footer>
+  </div>
+
+  <!-- jsPDF (si luego quieres PDF como tu hoja) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+
+  <!-- App -->
+  <script src="./app.js?v=1"></script>
+</body>
+</html>

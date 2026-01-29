@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Nexus Transport — Servicios</title>
+  <meta name="description" content="Nexus Transport — Sistema de servicios de transporte sincronizado con Firebase.">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Nexus Transport" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
+
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+<body>
+
+  <!-- ============== PANTALLA PIN (SEGURIDAD LOCAL) ============== -->
+  <div id="pinScreen" class="view view-centered">
+    <div class="card card-pin">
+      <div class="brand-header">
+        <div class="brand-logo-wrap">
+          <img id="pinLogo" src="assets/logo.png" alt="Logo" class="brand-logo">
+        </div>
+        <div class="brand-text-wrap">
+          <h1 id="pinAppName">Nexus Transport</h1>
+          <p>Acceso protegido por PIN</p>
+        </div>
+      </div>
+
+      <!-- ADMIN (PIN MAESTRO) -->
+      <label class="field-label" for="pinInput">PIN ADMIN (maestro)</label>
+      <input id="pinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
+
+      <div class="form-actions" style="margin-top:10px;">
+        <button id="pinEnterBtn" class="btn btn-primary">Entrar Admin</button>
+      </div>
+
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.08);margin:14px 0;">
+
+      <!-- EMPLEADO (NOMBRE + PIN) -->
+      <label class="field-label" for="empNameInput">Nombre (empleado)</label>
+      <input id="empNameInput" type="text" class="field-input" placeholder="Ej. Cynthia" autocomplete="off" />
+
+      <label class="field-label" for="empPinInput" style="margin-top:10px;">PIN (empleado)</label>
+      <input id="empPinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
+
+      <div class="form-actions" style="margin-top:10px;">
+        <button id="empEnterBtn" class="btn btn-secondary">Entrar Empleado</button>
+      </div>
+
+      <p id="pinError" class="msg-error"></p>
+      <p class="pin-hint"></p>
+    </div>
+  </div>
+
+  <!-- ============== PANTALLA AUTH (GOOGLE) ============== -->
+  <div id="authScreen" class="view view-centered hidden">
+    <div class="card card-auth">
+      <h2>Conectar con Google</h2>
+      <p>Inicia sesión con tu cuenta de Google para sincronizar servicios en todos los dispositivos.</p>
+      <button id="googleSignInBtn" class="btn btn-google">Conectar con Google</button>
+      <button id="authBackToPinBtn" class="btn btn-text">Volver al PIN</button>
+    </div>
+  </div>
+
+  <!-- ============== APP PRINCIPAL (CON PESTAÑAS) ============== -->
+  <div id="appShell" class="view hidden">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-inline">
+          <div class="brand-logo-wrap small">
+            <img id="appLogo" src="assets/logo.png" alt="Nexus Transport" class="brand-logo">
+          </div>
+          <div class="brand-text-wrap">
+            <div class="app-name-row">
+              <span id="appNameEditable" contenteditable="true" class="app-name">Nexus Transport</span>
+            </div>
+            <small class="app-subtitle" id="sessionSubtitle">Control de servicios de transporte</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <button data-page="dashboard" class="nav-btn nav-btn-active">Dashboard</button>
+        <button data-page="historial" class="nav-btn">Historial</button>
+        <button data-page="caja" class="nav-btn nav-admin">Caja</button>
+        <button data-page="config" class="nav-btn nav-admin">Configuración</button>
+        <button data-page="comisiones" class="nav-btn nav-admin">Comisiones</button>
+        <button data-page="propinas" class="nav-btn nav-admin">Extras</button>
+        <button data-page="retenciones" class="nav-btn nav-admin">Retenciones 10%</button>
+      </div>
+
+      <div class="topbar-right">
+        <div class="user-info">
+          <span id="userEmail" class="user-email">Sin conexión a Google</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="logoutBtn" class="btn btn-danger">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ========== PÁGINAS ========== -->
+    <main class="layout-main">
+
+      <!-- ====== PAGE: DASHBOARD ====== -->
+      <section id="page-dashboard" class="page active-page">
+        <div class="panel panel-form wide">
+          <h2>Nuevo servicio</h2>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Número</label>
+              <input id="ticketNumber" type="text" class="field-input" readonly />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Fecha</label>
+              <input id="ticketDate" type="date" class="field-input" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Cliente / Compañía</label>
+            <input id="clientName" type="text" class="field-input" placeholder="Ej. Marta González / Hotel X" />
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Conductor</label>
+              <select id="technician" class="field-input"></select>
+              <input id="technicianCustom" type="text" class="field-input mt-4" placeholder="Otro conductor (solo admin)" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Método de pago</label>
+              <select id="paymentMethod" class="field-input">
+                <option value="">Seleccionar...</option>
+                <option value="ATH Móvil">ATH Móvil</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Tarjeta">Tarjeta</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label class="field-label">Ruta / Servicio</label>
+              <input id="serviceDesc" type="text" class="field-input" placeholder="Ej. Aeropuerto → Hotel / Entrega / Viaje" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Millas recorridas</label>
+              <input id="miles" type="number" min="0" step="0.1" class="field-input" placeholder="0.0" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Tarifa por milla</label>
+              <input id="ratePerMile" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Extras (peajes, estacionamiento, etc.)</label>
+              <input id="tipAmount" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Total</label>
+              <input id="totalAmount" type="number" class="field-input" readonly />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="newTicketBtn" class="btn btn-secondary">Nuevo</button>
+            <button id="saveTicketBtn" class="btn btn-primary">Guardar</button>
+          </div>
+
+          <p id="formMessage" class="msg-info"></p>
+        </div>
+      </section>
+
+      <!-- ====== PAGE: HISTORIAL ====== -->
+      <section id="page-historial" class="page">
+        <div class="panel panel-history wide">
+          <div class="panel-header">
+            <h2>Historial de servicios</h2>
+            <div class="panel-header-actions nav-admin">
+              <button id="exportPdfBtn" class="btn btn-outline">Exportar PDF</button>
+              <button id="backupJsonBtn" class="btn btn-outline">Backup JSON</button>
+            </div>
+          </div>
+
+          <div class="filters-row nav-admin">
+            <div class="filter-group">
+              <label>Desde</label>
+              <input id="filterStart" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Hasta</label>
+              <input id="filterEnd" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Conductor</label>
+              <select id="filterTech" class="field-input small"></select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="applyFilterBtn" class="btn btn-small btn-primary">Filtrar</button>
+              <button id="clearFilterBtn" class="btn btn-small btn-text">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Conductor</th>
+                  <th>Ruta/Servicio</th>
+                  <th>Método</th>
+                  <th>Total</th>
+                  <th class="nav-admin">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="ticketsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== PAGE: CAJA ====== -->
+      <section id="page-caja" class="page">
+        <div class="panel wide">
+          <h2>Caja</h2>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label>Desde</label>
+              <input id="cajaStart" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Hasta</label>
+              <input id="cajaEnd" type="date" class="field-input small">
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="cajaApplyBtn" class="btn btn-small btn-primary">Aplicar</button>
+              <button id="cajaClearBtn" class="btn btn-small btn-text">Hoy</button>
+            </div>
+          </div>
+
+          <div class="caja-summary-grid">
+            <div class="caja-card cash">
+              <h3>Efectivo (Cash)</h3>
+              <p id="cajaTotalCash" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Solo servicios en efectivo</span>
+            </div>
+            <div class="caja-card">
+              <h3>ATH Móvil</h3>
+              <p id="cajaTotalAth" class="caja-amount">$0.00</p>
+            </div>
+            <div class="caja-card">
+              <h3>Tarjeta</h3>
+              <p id="cajaTotalCard" class="caja-amount">$0.00</p>
+            </div>
+            <div class="caja-card total">
+              <h3>Total general</h3>
+              <p id="cajaTotalAll" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Suma de todos los métodos</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== PAGE: CONFIGURACIÓN ====== -->
+      <section id="page-config" class="page">
+        <div class="panel wide">
+          <h2>Configuración de Nexus Transport</h2>
+
+          <div class="field-group">
+            <label class="field-label">Nombre de la app (header)</label>
+            <p class="msg-info small">Edita directamente el texto junto al logo en la barra superior.</p>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">URL del logo</label>
+              <input id="logoUrlInput" type="text" class="field-input" placeholder="https://...logo.png" />
+              <p class="msg-info small">
+                Si la dejas vacía se usará <code>assets/logo.png</code>. La URL se guarda en Firebase para sincronizar entre dispositivos.
+              </p>
+              <button id="saveBrandingBtn" class="btn btn-outline mt-4">Guardar branding en la nube</button>
+              <p id="brandingStatus" class="msg-info small"></p>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Texto de header para PDF</label>
+              <textarea id="pdfHeaderText" rows="4" class="field-input" placeholder="Encabezado para PDFs"></textarea>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Texto de footer para PDF</label>
+            <textarea id="pdfFooterText" rows="3" class="field-input" placeholder="Pie de página para PDFs"></textarea>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Texto de footer de la app</label>
+            <input id="footerTextInput" type="text" class="field-input" value="© 2025 Nexus Transport — Sistema de servicios" />
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Cambiar PIN ADMIN (maestro)</label>
+            <div class="grid-2">
+              <input id="newPinInput" type="password" maxlength="6" class="field-input" placeholder="Nuevo PIN" />
+              <button id="changePinBtn" class="btn btn-outline">Guardar PIN</button>
+            </div>
+            <p id="pinChangeMessage" class="msg-info small"></p>
+          </div>
+
+          <!-- ✅ ADMIN: Conductores + Usuarios -->
+          <div id="adminArea" class="field-group">
+            <h3>Administración: Conductores y Usuarios (PIN empleado)</h3>
+            <p class="msg-info small">
+              El admin puede crear empleados por conductor y asignar su % de comisión. Los empleados entran con <strong>Nombre + PIN</strong>.
+            </p>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Nombre (conductor/empleado)</label>
+                <input id="staffNameInput" type="text" class="field-input" placeholder="Ej. Cynthia">
+              </div>
+              <div class="field-group">
+                <label class="field-label">% Comisión</label>
+                <input id="staffRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="40">
+              </div>
+              <div class="field-group">
+                <label class="field-label">PIN empleado</label>
+                <input id="staffPinInput" type="password" maxlength="6" class="field-input" placeholder="1234">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button id="addStaffBtn" class="btn btn-primary">Añadir / Actualizar</button>
+              <button id="resetStaffBtn" class="btn btn-text">Limpiar</button>
+            </div>
+
+            <div class="table-wrap" style="margin-top:12px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Conductor</th>
+                    <th>% Comisión</th>
+                    <th>PIN</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody"></tbody>
+              </table>
+            </div>
+
+            <p class="msg-info small" style="margin-top:10px;">
+              * El PIN del empleado solo se usa para acceso interno.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====== PAGE: COMISIONES ====== -->
+      <section id="page-comisiones" class="page">
+        <div class="panel wide">
+          <div class="panel-header">
+            <h2>Comisiones por conductor</h2>
+            <p class="panel-subtitle">La comisión se calcula SOLO sobre Base (Millas × Tarifa). NO incluye extras.</p>
+          </div>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label for="comiStart">Desde</label>
+              <input type="date" id="comiStart" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="comiEnd">Hasta</label>
+              <input type="date" id="comiEnd" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="comiTech">Conductor</label>
+              <select id="comiTech" class="field-input small"></select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="comiApplyBtn" class="btn btn-small btn-primary">Aplicar</button>
+              <button id="comiClearBtn" class="btn btn-small btn-text">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Conductor</th>
+                  <th>% Comisión</th>
+                  <th>Total base</th>
+                  <th>Comisión</th>
+                </tr>
+              </thead>
+              <tbody id="comiTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="caja-summary-grid">
+            <div class="caja-card total">
+              <h3>Comisión total a pagar</h3>
+              <p id="comiTotal" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Suma de conductores filtrados</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: EXTRAS (antes Propinas) -->
+      <section id="page-propinas" class="page">
+        <div class="panel wide">
+          <div class="panel-header">
+            <h2>Extras</h2>
+            <p class="panel-subtitle">Los extras se totalizan aparte y NO afectan comisiones.</p>
+          </div>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label for="tipsStart">Desde</label>
+              <input type="date" id="tipsStart" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="tipsEnd">Hasta</label>
+              <input type="date" id="tipsEnd" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="tipsTech">Conductor</label>
+              <select id="tipsTech" class="field-input small"></select>
+            </div>
+            <div class="filter-group">
+              <label for="tipsGroup">Resumen</label>
+              <select id="tipsGroup" class="field-input small">
+                <option value="tech">Por conductor</option>
+                <option value="day">Por día</option>
+                <option value="week">Por semana</option>
+              </select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="tipsApplyBtn" class="btn btn-small btn-primary">Aplicar</button>
+              <button id="tipsClearBtn" class="btn btn-small btn-text">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Grupo</th>
+                  <th>Total extras</th>
+                </tr>
+              </thead>
+              <tbody id="tipsTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="caja-summary-grid">
+            <div class="caja-card total">
+              <h3>Extras totales</h3>
+              <p id="tipsTotal" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Suma del filtro actual</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: RETENCIONES -->
+      <section id="page-retenciones" class="page">
+        <div class="panel wide">
+          <div class="panel-header">
+            <h2>Retenciones (10%)</h2>
+            <p class="panel-subtitle">
+              Retención = 10% de la comisión. Neto = Comisión - Retención. (Extras no entran.)
+            </p>
+          </div>
+
+          <button id="retenPdfBtn" class="btn btn-outline">Exportar PDF (Retenciones)</button>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label for="retenStart">Desde</label>
+              <input type="date" id="retenStart" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="retenEnd">Hasta</label>
+              <input type="date" id="retenEnd" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label for="retenTech">Conductor</label>
+              <select id="retenTech" class="field-input small"></select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="retenApplyBtn" class="btn btn-small btn-primary">Aplicar</button>
+              <button id="retenClearBtn" class="btn btn-small btn-text">Limpiar</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Conductor</th>
+                  <th>Total base</th>
+                  <th>% Comisión</th>
+                  <th>Comisión</th>
+                  <th>Retención 10%</th>
+                  <th>Neto a pagar</th>
+                </tr>
+              </thead>
+              <tbody id="retenTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="caja-summary-grid">
+            <div class="caja-card total">
+              <h3>Neto total a pagar</h3>
+              <p id="retenTotal" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Suma neta del filtro actual</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <span id="footerText">© 2025 Nexus Transport — Sistema de servicios</span>
+    </footer>
+  </div>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+
+  <!-- App -->
+  <script src="app.js?v=1"></script>
+</body>
+</html>

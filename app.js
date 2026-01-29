@@ -431,10 +431,7 @@ function roleFilteredTickets(list) {
  * (Pegar después de la Parte 1/3)
  *************************************************/
 
-/* ========== DOM: PANTALLAS ========= */
-const pinScreen = document.getElementById("pinScreen");
-const authScreen = document.getElementById("authScreen");
-const appShell = document.getElementById("appShell");
+
 
 /* ========== DOM: PIN ========= */
 const pinInput = document.getElementById("pinInput");

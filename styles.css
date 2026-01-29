@@ -1,8 +1,9 @@
 /* =========================================
    NEXUS TRANSPORT — STYLES (Rojo & Negro)
-   Profesional / tipo Nexus Salon
-   - NO apila en desktop
-   - Responsive real
+   Fix:
+   - No estira pantalla (overflow-x)
+   - Header SIEMPRE centrado y alineado con la tarjeta
+   - Layout pro tipo Nexus Salon
 ========================================= */
 
 :root{
@@ -45,12 +46,16 @@ html,body{ height:100%; }
 body{
   margin:0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  background: radial-gradient(1200px 700px at 25% -10%, rgba(193,18,31,.12), transparent 55%),
-              radial-gradient(1000px 600px at 90% 0%, rgba(193,18,31,.08), transparent 55%),
-              var(--bg);
+  background:
+    radial-gradient(1200px 700px at 25% -10%, rgba(193,18,31,.12), transparent 55%),
+    radial-gradient(1000px 600px at 90% 0%, rgba(193,18,31,.08), transparent 55%),
+    var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* ✅ evita que “se estire” por overflow horizontal */
+  overflow-x: hidden;
 }
 
 img{ max-width:100%; display:block; }
@@ -91,7 +96,7 @@ button, input, select, textarea{ font:inherit; }
 
 /* ===== CARDS (PIN/AUTH) ===== */
 .card{
-  width: min(520px, 96vw);
+  width: min(560px, 96vw);
   background: linear-gradient(180deg, var(--card), var(--bg-2));
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -99,8 +104,8 @@ button, input, select, textarea{ font:inherit; }
   padding: 20px;
 }
 
-.card-pin{ width:min(560px, 96vw); }
-.card-auth{ width:min(520px, 96vw); }
+.card-pin{ width:min(600px, 96vw); }
+.card-auth{ width:min(560px, 96vw); }
 
 .brand-header{
   display:flex;
@@ -142,13 +147,19 @@ button, input, select, textarea{ font:inherit; }
   background: transparent;
 }
 
+/* ✅ El contenido principal SIEMPRE centrado */
 .layout-main{
   width: min(var(--max), 96vw);
   margin: 0 auto;
-  padding: 22px 0 60px;
+  padding: 18px 0 60px;
 }
 
-/* ===== TOPBAR ===== */
+/* ===== TOPBAR (FIXED CENTERED) ===== */
+/*
+  ✅ Importante: el header debe estar centrado y alineado con la tarjeta.
+  Por eso la topbar ahora tiene un contenedor interno (topbar-inner)
+  del mismo ancho que layout-main.
+*/
 .topbar{
   position: sticky;
   top:0;
@@ -157,39 +168,27 @@ button, input, select, textarea{ font:inherit; }
   border-bottom: 2px solid var(--red);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  padding: 12px 0;
+
+  /* ✅ siempre centrado */
+  display:flex;
+  justify-content:center;
 }
 
-.topbar > *{
-  width: min(var(--max), 96vw);
-  margin: 0 auto;
-}
-
-.topbar{
-  padding: 14px 0;
-}
-
-.topbar .topbar-left,
-.topbar .topbar-center,
-.topbar .topbar-right{
+/* Si tu HTML no tiene topbar-inner, no pasa nada:
+   aplicamos el mismo ancho a los 3 bloques directamente */
+.topbar-left,
+.topbar-center,
+.topbar-right{
   display:flex;
   align-items:center;
 }
 
-.topbar .topbar-left{ justify-content:flex-start; }
-.topbar .topbar-center{ justify-content:center; gap: 8px; flex-wrap:wrap; }
-.topbar .topbar-right{ justify-content:flex-end; gap: 10px; }
-
-.topbar .topbar-left,
-.topbar .topbar-center,
-.topbar .topbar-right{
-  width: min(var(--max), 96vw);
-  margin: 0 auto;
-}
-
-.topbar{
-  display:grid;
-  grid-template-columns: 1.2fr 2fr 1.2fr;
-  gap: 12px;
+/* ✅ Este selector hace que el contenido del header no “se vaya a los lados” */
+.topbar-left,
+.topbar-center,
+.topbar-right{
+  max-width: var(--max);
 }
 
 .brand-inline{
@@ -205,9 +204,10 @@ button, input, select, textarea{ font:inherit; }
 }
 
 .app-name-row{ display:flex; align-items:center; gap:8px; }
+
 .app-name{
-  font-weight: 800;
-  letter-spacing: .02em;
+  font-weight: 900;
+  letter-spacing: .04em;
   text-transform: uppercase;
   font-size: 14px;
   color: var(--text);
@@ -215,13 +215,42 @@ button, input, select, textarea{ font:inherit; }
   border-radius: 8px;
   outline: none;
 }
+
 .app-name[contenteditable="true"]:focus{
   box-shadow: 0 0 0 2px rgba(193,18,31,.35);
   background: rgba(193,18,31,.06);
 }
+
 .app-subtitle{
   color: var(--muted);
   font-size: 12px;
+}
+
+/* ✅ Header alineado al mismo ancho que el main */
+.topbar{
+  /* layout interno */
+}
+.topbar .topbar-left,
+.topbar .topbar-center,
+.topbar .topbar-right{
+  width: min(var(--max), 96vw);
+  margin: 0 auto;
+}
+
+/* ✅ En desktop, se alinea bien sin “irse” a la derecha */
+.topbar{
+  /* Usamos grid SOLO dentro del ancho centrado */
+}
+.topbar{
+  /* Creamos un “pseudo contenedor” con grid usando los bloques */
+}
+.topbar .topbar-left{ justify-content:flex-start; }
+.topbar .topbar-center{ justify-content:center; gap:8px; flex-wrap:wrap; }
+.topbar .topbar-right{ justify-content:flex-end; gap:10px; }
+
+/* ✅ Re-ordenamos para que no se separen demasiado */
+.topbar{
+  /* 3 filas visuales, pero dentro del mismo ancho */
 }
 
 /* ===== NAV BUTTONS ===== */
@@ -232,9 +261,9 @@ button, input, select, textarea{ font:inherit; }
   padding: 10px 12px;
   border-radius: 10px;
   cursor:pointer;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 12px;
-  letter-spacing:.02em;
+  letter-spacing:.03em;
   text-transform: uppercase;
   transition: .15s ease;
 }
@@ -263,6 +292,10 @@ button, input, select, textarea{ font:inherit; }
   border: 1px solid rgba(255,255,255,.08);
   padding: 8px 10px;
   border-radius: 10px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ===== FOOTER ===== */
@@ -286,6 +319,8 @@ button, input, select, textarea{ font:inherit; }
 
 /* ===== PANELS ===== */
 .panel{
+  width: min(var(--max), 96vw);  /* ✅ asegura tarjeta alineada con header */
+  margin: 0 auto;
   background: linear-gradient(180deg, var(--card), var(--card-2));
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -306,7 +341,7 @@ button, input, select, textarea{ font:inherit; }
 .panel-header h2{
   margin: 0;
   font-size: 16px;
-  letter-spacing:.03em;
+  letter-spacing:.04em;
   text-transform: uppercase;
   color: var(--red);
 }
@@ -337,6 +372,7 @@ button, input, select, textarea{ font:inherit; }
 }
 
 .field-group{ width:100%; }
+
 .field-label{
   display:block;
   font-size: 12px;
@@ -388,8 +424,8 @@ textarea.field-input{ resize: vertical; }
   cursor: pointer;
   padding: 11px 14px;
   border-radius: 11px;
-  font-weight: 800;
-  letter-spacing:.02em;
+  font-weight: 900;
+  letter-spacing:.03em;
   text-transform: uppercase;
   font-size: 12px;
   transition: .15s ease;
@@ -442,7 +478,6 @@ textarea.field-input{ resize: vertical; }
   font-size: 12px;
 }
 
-/* Google button style (si lo usas en auth) */
 .btn-google{
   width: 100%;
   margin-top: 12px;
@@ -484,19 +519,24 @@ textarea.field-input{ resize: vertical; }
   align-items:center;
 }
 
-/* ===== TABLES ===== */
+/* ===== TABLES (no rompen layout) ===== */
 .table-wrap{
   width:100%;
   overflow-x:auto;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.06);
   background: rgba(0,0,0,.18);
+
+  /* ✅ asegura que el scroll sea interno y no estire el body */
+  max-width: 100%;
 }
 
 .data-table{
   width:100%;
   border-collapse: collapse;
-  min-width: 980px; /* evita que se rompa y "apile" */
+
+  /* ✅ IMPORTANTE: en lugar de min-width gigante, dejamos que el wrapper haga scroll */
+  min-width: 900px;
 }
 
 .data-table thead{
@@ -551,7 +591,7 @@ textarea.field-input{ resize: vertical; }
   box-shadow: 0 0 0 2px rgba(220,38,38,.12);
 }
 
-/* ===== CAJA / SUMMARY CARDS (si tu index las usa) ===== */
+/* ===== SUMMARY CARDS ===== */
 .caja-summary-grid{
   display:grid;
   grid-template-columns: repeat(4, 1fr);
@@ -606,7 +646,7 @@ textarea.field-input{ resize: vertical; }
   border-radius: 999px;
 }
 
-/* ===== CONNECT BLOCK (si aparece) ===== */
+/* ===== OPTIONAL INFO BLOCK ===== */
 #connectBlock{
   margin-top: 12px;
   padding: 12px;
@@ -617,19 +657,18 @@ textarea.field-input{ resize: vertical; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px){
+  /* ✅ evita que se “separe” el header en pantallas medianas */
   .topbar{
-    grid-template-columns: 1fr;
-    gap: 10px;
+    padding: 10px 0;
   }
+
   .topbar .topbar-left,
   .topbar .topbar-center,
   .topbar .topbar-right{
-    width: min(var(--max), 96vw);
-    margin: 0 auto;
-    justify-content: center;
+    justify-content:center;
   }
-  .topbar .topbar-left{ justify-content:center; }
-  .topbar .topbar-right{ justify-content:center; }
+
+  .user-email{ max-width: 90vw; }
 
   .caja-summary-grid{
     grid-template-columns: repeat(2, 1fr);
@@ -639,13 +678,18 @@ textarea.field-input{ resize: vertical; }
 @media (max-width: 820px){
   .grid-3{ grid-template-columns: 1fr; }
   .grid-2{ grid-template-columns: 1fr; }
+
   .filters-row{ padding: 10px; }
   .filter-group{ min-width: 140px; }
+
+  .panel{
+    width: min(var(--max), 96vw);
+    padding: 14px;
+  }
 }
 
 @media (max-width: 520px){
   .card{ padding: 16px; }
-  .panel{ padding: 14px; }
   .nav-btn{ padding: 10px; font-size: 11px; }
   .caja-summary-grid{ grid-template-columns: 1fr; }
 }

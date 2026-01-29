@@ -1,0 +1,227 @@
+/* ===============================
+   NEXUS TRANSPORT — STYLES
+   Rojo & Negro Corporativo
+================================ */
+
+:root {
+  --bg-main: #0b0b0d;
+  --bg-card: #121214;
+  --bg-header: #08080a;
+
+  --red-main: #c1121f;
+  --red-soft: #8d0d15;
+
+  --text-main: #f1f1f1;
+  --text-muted: #9ca3af;
+
+  --border-main: #27272a;
+  --border-soft: #1f1f23;
+
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+}
+
+/* ===== RESET ===== */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* ===== TOP BAR ===== */
+.topbar {
+  background: linear-gradient(
+    180deg,
+    #0b0b0d 0%,
+    #070709 100%
+  );
+  border-bottom: 2px solid var(--red-main);
+  padding: 14px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--red-main);
+}
+
+/* ===== LAYOUT ===== */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===== CARDS ===== */
+.card {
+  background: linear-gradient(
+    180deg,
+    var(--bg-card),
+    #0e0e10
+  );
+  border: 1px solid var(--border-main);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow:
+    0 0 0 1px rgba(193, 18, 31, 0.05),
+    0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.card h2 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--red-main);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 8px;
+}
+
+/* ===== INPUTS ===== */
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: #0a0a0c;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+input::placeholder {
+  color: #6b7280;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--red-main);
+  box-shadow: 0 0 0 1px rgba(193, 18, 31, 0.4);
+}
+
+/* ===== BUTTONS ===== */
+button {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button.primary {
+  background: linear-gradient(
+    180deg,
+    var(--red-main),
+    var(--red-soft)
+  );
+  color: #fff;
+}
+
+button.primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  background: #141416;
+  border: 1px solid var(--border-main);
+  color: var(--text-main);
+}
+
+button.secondary:hover {
+  border-color: var(--red-main);
+  color: var(--red-main);
+}
+
+/* ===== TABLES ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+thead {
+  background: #0a0a0c;
+}
+
+th {
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 10px;
+  border-bottom: 1px solid var(--border-main);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+}
+
+tr:hover {
+  background: rgba(193, 18, 31, 0.04);
+}
+
+/* ===== STATUS COLORS ===== */
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger  { color: var(--danger); }
+
+/* ===== FOOTER ===== */
+footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-soft);
+  margin-top: 40px;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .container {
+    padding: 14px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .topbar h1 {
+    font-size: 16px;
+  }
+}

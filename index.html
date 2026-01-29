@@ -2,55 +2,70 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cierre Diario Operacional</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Transport</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="styles.css">
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
 <header class="topbar">
-  <h1>Cierre Diario</h1>
-  <span id="fecha"></span>
+  <img src="logo.png" class="logo">
+  <h1>Nexus Transport</h1>
+  <button id="logoutBtn">Salir</button>
 </header>
 
-<main class="container">
+<section id="loginView">
+  <button id="loginBtn">Ingresar con Google</button>
+</section>
 
-  <section class="card">
-    <h2>Ingresos</h2>
-    <table>
-      <tr><th>Concepto</th><th>Monto</th></tr>
-      <tr><td>Millas</td><td><input type="number" id="millas"></td></tr>
-      <tr><td>Enganche Connect</td><td><input type="number" id="enganche"></td></tr>
-      <tr><td>Cash</td><td><input type="number" id="cash"></td></tr>
-      <tr><td>Créditos</td><td><input type="number" id="creditos"></td></tr>
-      <tr><td>Mapfre</td><td><input type="number" id="mapfre"></td></tr>
-    </table>
-  </section>
+<section id="appView" hidden>
 
-  <section class="card">
-    <h2>Ajustes</h2>
-    <table>
-      <tr><td>Descuento</td><td><input type="number" id="descuento"></td></tr>
-      <tr><td>Retención</td><td><input type="number" id="retencion"></td></tr>
-    </table>
-  </section>
+  <div class="kpis">
+    <div class="card"><span>Total Bruto</span><strong id="kpiBruto">$0</strong></div>
+    <div class="card"><span>Millas</span><strong id="kpiMillas">0</strong></div>
+    <div class="card"><span>Servicios</span><strong id="kpiServicios">0</strong></div>
+    <div class="card"><span>$ / Milla</span><strong id="kpiPorMilla">$0</strong></div>
+  </div>
 
-  <section class="card">
-    <h2>Gastos</h2>
-    <table>
-      <tr><td>Total Gastos</td><td><input type="number" id="gastos"></td></tr>
-      <tr><td>Efectivo en Bolsa</td><td><input type="number" id="bolsa"></td></tr>
-    </table>
-  </section>
+  <h2>Registrar servicio</h2>
+  <form id="serviceForm">
+    <input type="date" id="fecha" required>
+    <input type="text" id="chofer" placeholder="Chofer" required>
+    <select id="cliente">
+      <option>CONNECT</option>
+      <option>AAA</option>
+      <option>DEALER</option>
+      <option>PRIVADO</option>
+    </select>
+    <input type="number" id="monto" placeholder="Monto $" required>
+    <input type="number" id="millas" placeholder="Millas" required>
+    <select id="metodo">
+      <option>CASH</option>
+      <option>ATH</option>
+      <option>CREDITO</option>
+    </select>
+    <input type="number" id="gastos" placeholder="Gastos">
+    <button type="submit">Guardar</button>
+  </form>
 
-  <section class="card total">
-    <h2>Total a Pagar</h2>
-    <div id="resultado">$0.00</div>
-    <button onclick="calcular()">Calcular Cierre</button>
-  </section>
+  <h2>Últimos servicios</h2>
+  <table id="servicesTable"></table>
 
-</main>
+  <button id="closeWeekBtn">Cerrar semana</button>
+</section>
 
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="calculations.js"></script>
+<script src="pdf.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

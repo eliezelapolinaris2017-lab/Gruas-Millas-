@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Nexus Transport</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
 
-  <!-- Firebase -->
+  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -14,58 +14,151 @@
   <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
+
 <body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <img src="logo.png" class="logo" alt="Logo" onerror="this.style.display='none'">
+      <div class="brandtext">
+        <div class="brandtitle">Nexus Transport</div>
+        <div class="brandmeta">Servicios • Cierre semanal • Facturación</div>
+      </div>
+    </div>
 
-<header class="topbar">
-  <img src="logo.png" class="logo">
-  <h1>Nexus Transport</h1>
-  <button id="logoutBtn">Salir</button>
-</header>
+    <div class="topbar-right">
+      <button id="logoutBtn" class="btn btn-ghost" type="button">Salir</button>
+    </div>
+  </header>
 
-<section id="loginView">
-  <button id="loginBtn">Ingresar con Google</button>
-</section>
+  <!-- LOGIN -->
+  <section id="loginView">
+    <div class="container">
+      <div class="panel">
+        <h2 class="panel-title">Acceso</h2>
+        <p class="panel-sub">
+          Inicia sesión con Google para operar y sincronizar datos.
+        </p>
+        <button id="loginBtn" class="btn btn-primary" type="button">
+          Ingresar con Google
+        </button>
+        <div class="hint">
+          * Solo usuarios autorizados (admins).
+        </div>
+      </div>
+    </div>
+  </section>
 
-<section id="appView" hidden>
+  <!-- APP -->
+  <section id="appView" hidden>
+    <div class="container">
 
-  <div class="kpis">
-    <div class="card"><span>Total Bruto</span><strong id="kpiBruto">$0</strong></div>
-    <div class="card"><span>Millas</span><strong id="kpiMillas">0</strong></div>
-    <div class="card"><span>Servicios</span><strong id="kpiServicios">0</strong></div>
-    <div class="card"><span>$ / Milla</span><strong id="kpiPorMilla">$0</strong></div>
-  </div>
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="card kpi">
+          <div class="kpi-label">Total bruto semana</div>
+          <div class="kpi-value" id="kpiBruto">$0.00</div>
+          <div class="kpi-sub" id="kpiSemana">Semana actual</div>
+        </div>
 
-  <h2>Registrar servicio</h2>
-  <form id="serviceForm">
-    <input type="date" id="fecha" required>
-    <input type="text" id="chofer" placeholder="Chofer" required>
-    <select id="cliente">
-      <option>CONNECT</option>
-      <option>AAA</option>
-      <option>DEALER</option>
-      <option>PRIVADO</option>
-    </select>
-    <input type="number" id="monto" placeholder="Monto $" required>
-    <input type="number" id="millas" placeholder="Millas" required>
-    <select id="metodo">
-      <option>CASH</option>
-      <option>ATH</option>
-      <option>CREDITO</option>
-    </select>
-    <input type="number" id="gastos" placeholder="Gastos">
-    <button type="submit">Guardar</button>
-  </form>
+        <div class="card kpi">
+          <div class="kpi-label">Millas semana</div>
+          <div class="kpi-value" id="kpiMillas">0</div>
+          <div class="kpi-sub">Total millas</div>
+        </div>
 
-  <h2>Últimos servicios</h2>
-  <table id="servicesTable"></table>
+        <div class="card kpi">
+          <div class="kpi-label">Servicios</div>
+          <div class="kpi-value" id="kpiServicios">0</div>
+          <div class="kpi-sub">Total servicios</div>
+        </div>
 
-  <button id="closeWeekBtn">Cerrar semana</button>
-</section>
+        <div class="card kpi">
+          <div class="kpi-label">Ingreso neto / milla</div>
+          <div class="kpi-value" id="kpiPorMilla">$0.00</div>
+          <div class="kpi-sub">Neto real</div>
+        </div>
+      </div>
 
-<script src="firebase.js"></script>
-<script src="auth.js"></script>
-<script src="calculations.js"></script>
-<script src="pdf.js"></script>
-<script src="app.js"></script>
+      <!-- Registrar -->
+      <div class="panel">
+        <h2 class="panel-title">Registrar servicio</h2>
+
+        <form id="serviceForm" class="form-grid">
+          <div class="field">
+            <label>Fecha</label>
+            <input type="date" id="fecha" required />
+          </div>
+
+          <div class="field">
+            <label>Chofer</label>
+            <input type="text" id="chofer" placeholder="Ej. Adolfo" required />
+          </div>
+
+          <div class="field">
+            <label>Cliente</label>
+            <select id="cliente">
+              <option value="CONNECT">CONNECT</option>
+              <option value="AAA">AAA</option>
+              <option value="DEALER">DEALER</option>
+              <option value="PRIVADO">PRIVADO</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Método pago</label>
+            <select id="metodo">
+              <option value="CASH">CASH</option>
+              <option value="ATH">ATH</option>
+              <option value="CREDITO">CREDITO</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Monto $</label>
+            <input type="number" id="monto" step="0.01" placeholder="0.00" required />
+          </div>
+
+          <div class="field">
+            <label>Millas</label>
+            <input type="number" id="millas" step="0.1" placeholder="0" required />
+          </div>
+
+          <div class="field">
+            <label>Gastos</label>
+            <input type="number" id="gastos" step="0.01" placeholder="0.00" />
+          </div>
+
+          <div class="field">
+            <label>Nota</label>
+            <input type="text" id="nota" placeholder="Opcional" />
+          </div>
+
+          <button class="btn btn-primary btn-wide" type="submit">Guardar</button>
+        </form>
+      </div>
+
+      <!-- Tabla -->
+      <div class="panel">
+        <h2 class="panel-title">Últimos servicios</h2>
+
+        <div class="table-wrap">
+          <table id="servicesTable" class="table"></table>
+        </div>
+
+        <div class="actions">
+          <button id="closeWeekBtn" class="btn btn-primary" type="button">
+            Cerrar semana
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <script src="firebase.js"></script>
+  <script src="auth.js"></script>
+  <script src="calculations.js"></script>
+  <script src="pdf.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

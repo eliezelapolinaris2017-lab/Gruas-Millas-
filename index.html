@@ -4,11 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Nexus Transport — Cuadres</title>
-  <meta name="description" content="Nexus Transport — Cuadres por chofer. Servicios, millas, cash, gastos y reportes.">
+  <meta name="description" content="Nexus Transport — Sistema de servicios, millas y cuadres sincronizado con Firebase.">
 
-  <!-- PWA -->
+  <!-- PWA (rutas relativas para GitHub Pages) -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" content="#0b0b0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
@@ -16,12 +16,12 @@
   <link rel="apple-touch-icon" href="assets/logo.png" />
 
   <link rel="icon" type="image/png" href="assets/logo.png" />
-  <link rel="stylesheet" href="styles.css?v=1" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 
 <body>
 
-  <!-- ============== PANTALLA PIN (SEGURIDAD LOCAL) ============== -->
+  <!-- ================= PANTALLA PIN ================= -->
   <div id="pinScreen" class="view view-centered">
     <div class="card card-pin">
       <div class="brand-header">
@@ -34,7 +34,7 @@
         </div>
       </div>
 
-      <!-- ADMIN (PIN MAESTRO) -->
+      <!-- ADMIN -->
       <label class="field-label" for="pinInput">PIN ADMIN (maestro)</label>
       <input id="pinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
 
@@ -44,9 +44,9 @@
 
       <hr style="border:0;border-top:1px solid rgba(255,255,255,.08);margin:14px 0;">
 
-      <!-- EMPLEADO (NOMBRE + PIN) -->
+      <!-- CHOFER -->
       <label class="field-label" for="empNameInput">Nombre (chofer)</label>
-      <input id="empNameInput" type="text" class="field-input" placeholder="Ej. Adolfo" autocomplete="off" />
+      <input id="empNameInput" type="text" class="field-input" placeholder="Ej. Adolfo Mejia" autocomplete="off" />
 
       <label class="field-label" for="empPinInput" style="margin-top:10px;">PIN (chofer)</label>
       <input id="empPinInput" type="password" maxlength="6" class="field-input" autocomplete="off" />
@@ -56,21 +56,21 @@
       </div>
 
       <p id="pinError" class="msg-error"></p>
-      <p class="pin-hint"></p>
+      <p class="pin-hint">* Admin y chofer usan PIN local. Luego se conecta Google para sincronizar.</p>
     </div>
   </div>
 
-  <!-- ============== PANTALLA AUTH (GOOGLE) ============== -->
+  <!-- ================= PANTALLA AUTH ================= -->
   <div id="authScreen" class="view view-centered hidden">
     <div class="card card-auth">
       <h2>Conectar con Google</h2>
-      <p>Inicia sesión con tu cuenta de Google para sincronizar servicios y cuadres en todos los dispositivos.</p>
+      <p>Inicia sesión con tu cuenta de Google para sincronizar servicios en todos los dispositivos.</p>
       <button id="googleSignInBtn" class="btn btn-google">Conectar con Google</button>
       <button id="authBackToPinBtn" class="btn btn-text">Volver al PIN</button>
     </div>
   </div>
 
-  <!-- ============== APP PRINCIPAL (CON PESTAÑAS) ============== -->
+  <!-- ================= APP ================= -->
   <div id="appShell" class="view hidden">
 
     <!-- Topbar -->
@@ -84,7 +84,7 @@
             <div class="app-name-row">
               <span id="appNameEditable" contenteditable="true" class="app-name">Nexus Transport</span>
             </div>
-            <small class="app-subtitle" id="sessionSubtitle">Cuadres por chofer — semanal (Jue→Jue)</small>
+            <small class="app-subtitle" id="sessionSubtitle">Cuadres de servicios y millas (Jue→Jue)</small>
           </div>
         </div>
       </div>
@@ -92,9 +92,11 @@
       <div class="topbar-center">
         <button data-page="dashboard" class="nav-btn nav-btn-active">Dashboard</button>
         <button data-page="historial" class="nav-btn">Historial</button>
+
         <button data-page="caja" class="nav-btn nav-admin">Caja</button>
-        <button data-page="config" class="nav-btn nav-admin">Configuración</button>
         <button data-page="resumen" class="nav-btn nav-admin">Resumen</button>
+        <button data-page="comisiones" class="nav-btn nav-admin">Comisiones</button>
+        <button data-page="config" class="nav-btn nav-admin">Configuración</button>
       </div>
 
       <div class="topbar-right">
@@ -107,16 +109,13 @@
       </div>
     </header>
 
-    <!-- ========== PÁGINAS ========== -->
+    <!-- Pages -->
     <main class="layout-main">
 
-      <!-- ====== PAGE: DASHBOARD ====== -->
+      <!-- ================= DASHBOARD ================= -->
       <section id="page-dashboard" class="page active-page">
         <div class="panel panel-form wide">
           <h2>Nuevo servicio</h2>
-          <p class="msg-info small" style="margin-top:-4px;">
-            ✅ <strong>Millas siempre se entran manual</strong> (Connect o cualquier otra compañía).
-          </p>
 
           <div class="grid-2">
             <div class="field-group">
@@ -143,7 +142,15 @@
                 <option value="Cash">Cash</option>
                 <option value="ATH Móvil">ATH Móvil</option>
                 <option value="Crédito">Crédito</option>
-                <option value="Depósito">Depósito</option>
+                <option value="Mapfre">Mapfre</option>
+                <option value="Cops">Cops</option>
+                <option value="AAA">AAA</option>
+                <option value="Enterprise">Enterprise</option>
+                <option value="OD">OD (Connect)</option>
+                <option value="Salvamentos">Salvamentos</option>
+                <option value="Extracciones">Extracciones</option>
+                <option value="Privado">Privado</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
           </div>
@@ -154,46 +161,50 @@
               <select id="category" class="field-input">
                 <option value="">Seleccionar...</option>
                 <option value="Connect">Connect</option>
-                <option value="Viales">Viales</option>
                 <option value="Enganche Connect">Enganche Connect</option>
-
+                <option value="Viales">Viales</option>
                 <option value="Cops">Cops</option>
                 <option value="AAA">AAA</option>
                 <option value="Enterprise">Enterprise</option>
                 <option value="Mapfre">Mapfre</option>
-                <option value="Crédito (Privado)">Crédito (Privado) / Cliente</option>
-                <option value="Erika / Code Pola / AAA">Erika / Code Pola / AAA</option>
-
+                <option value="Crédito">Crédito</option>
+                <option value="Erika / Code Pola">Erika / Code Pola</option>
+                <option value="ATH Móvil">ATH Móvil</option>
                 <option value="Salvamentos">Salvamentos</option>
-                <option value="OD (Connect)">OD (Connect)</option>
+                <option value="OD">OD (Connect)</option>
                 <option value="Extracciones">Extracciones</option>
-                <option value="ATH Mobile (Servicios)">ATH Mobile (Servicios)</option>
+                <option value="Gastos">Gastos</option>
+                <option value="En Bolsa">En Bolsa</option>
+                <option value="Uso del Cash">Uso del Cash</option>
+                <option value="Pago Peaje">Pago Peaje</option>
+                <option value="Se le Debe">Se le Debe</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
 
             <div class="field-group">
-              <label class="field-label">Descripción (opcional)</label>
-              <input id="description" type="text" class="field-input" placeholder="Ej. Centro Toyota RP → Braulio..." />
+              <label class="field-label">Monto ($)</label>
+              <input id="amount" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
+              <p class="msg-info small">Si es gasto, usa monto positivo (ej: 290.00). El resumen lo cuadrará.</p>
             </div>
           </div>
 
-          <div class="grid-3">
+          <div class="grid-2">
             <div class="field-group">
-              <label class="field-label">Millas (manual)</label>
+              <label class="field-label">Millas (SIEMPRE manual)</label>
               <input id="miles" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
-              <p class="msg-info small">Se guardan siempre, aunque NO sea Connect.</p>
+              <p class="msg-info small">Connect y NO Connect: aquí siempre se registran las millas.</p>
             </div>
 
             <div class="field-group">
-              <label class="field-label">Monto del servicio</label>
-              <input id="amount" type="number" min="0" step="0.01" class="field-input" placeholder="0.00" />
-              <p class="msg-info small">Monto cobrado / facturado.</p>
+              <label class="field-label">Descripción (opcional)</label>
+              <input id="description" type="text" class="field-input" placeholder="Ej. Centro Toyota RP → Brawlio..." />
             </div>
+          </div>
 
-            <div class="field-group">
-              <label class="field-label">Notas (opcional)</label>
-              <input id="notes" type="text" class="field-input" placeholder="Ej. Solo recoger / peaje / etc." />
-            </div>
+          <div class="field-group">
+            <label class="field-label">Notas (opcional)</label>
+            <input id="notes" type="text" class="field-input" placeholder="Cualquier detalle: cheque, turno, etc." />
           </div>
 
           <div class="form-actions">
@@ -205,11 +216,11 @@
         </div>
       </section>
 
-      <!-- ====== PAGE: HISTORIAL ====== -->
+      <!-- ================= HISTORIAL ================= -->
       <section id="page-historial" class="page">
         <div class="panel panel-history wide">
           <div class="panel-header">
-            <h2>Historial de servicios</h2>
+            <h2>Historial</h2>
             <div class="panel-header-actions nav-admin">
               <button id="backupJsonBtn" class="btn btn-outline">Backup JSON</button>
             </div>
@@ -224,7 +235,7 @@
               <label>Hasta</label>
               <input id="filterEnd" type="date" class="field-input small">
             </div>
-            <div class="filter-group">
+            <div class="filter-group nav-admin">
               <label>Chofer</label>
               <select id="filterDriver" class="field-input small"></select>
             </div>
@@ -233,21 +244,26 @@
               <select id="filterCategory" class="field-input small">
                 <option value="">Todas</option>
                 <option value="Connect">Connect</option>
-                <option value="Viales">Viales</option>
                 <option value="Enganche Connect">Enganche Connect</option>
+                <option value="Viales">Viales</option>
                 <option value="Cops">Cops</option>
                 <option value="AAA">AAA</option>
                 <option value="Enterprise">Enterprise</option>
                 <option value="Mapfre">Mapfre</option>
-                <option value="Crédito (Privado)">Crédito (Privado) / Cliente</option>
-                <option value="Erika / Code Pola / AAA">Erika / Code Pola / AAA</option>
+                <option value="Crédito">Crédito</option>
+                <option value="Erika / Code Pola">Erika / Code Pola</option>
+                <option value="ATH Móvil">ATH Móvil</option>
                 <option value="Salvamentos">Salvamentos</option>
-                <option value="OD (Connect)">OD (Connect)</option>
+                <option value="OD">OD</option>
                 <option value="Extracciones">Extracciones</option>
-                <option value="ATH Mobile (Servicios)">ATH Mobile (Servicios)</option>
+                <option value="Gastos">Gastos</option>
+                <option value="En Bolsa">En Bolsa</option>
+                <option value="Uso del Cash">Uso del Cash</option>
+                <option value="Pago Peaje">Pago Peaje</option>
+                <option value="Se le Debe">Se le Debe</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
-
             <div class="filter-group filter-actions">
               <button id="applyFilterBtn" class="btn btn-small btn-primary">Filtrar</button>
               <button id="clearFilterBtn" class="btn btn-small btn-text">Limpiar</button>
@@ -275,13 +291,13 @@
         </div>
       </section>
 
-      <!-- ====== PAGE: CAJA (admin) ====== -->
+      <!-- ================= CAJA (ADMIN) ================= -->
       <section id="page-caja" class="page">
         <div class="panel wide">
-          <h2>Caja / Cuadre (admin)</h2>
-          <p class="msg-info small">
-            Aquí vamos a cuadrar: <strong>Cash en recibo + Cash traído + Gastos</strong>.
-          </p>
+          <div class="panel-header">
+            <h2>Caja</h2>
+            <p class="panel-subtitle">Totales por método (filtra por fecha y chofer)</p>
+          </div>
 
           <div class="filters-row">
             <div class="filter-group">
@@ -303,98 +319,32 @@
           </div>
 
           <div class="caja-summary-grid">
-            <div class="caja-card">
-              <h3>Total Cash</h3>
+            <div class="caja-card cash">
+              <h3>Cash</h3>
               <p id="cajaTotalCash" class="caja-amount">$0.00</p>
-              <span class="caja-badge">Servicios en Cash</span>
             </div>
-
             <div class="caja-card">
-              <h3>Total ATH</h3>
+              <h3>ATH Móvil</h3>
               <p id="cajaTotalAth" class="caja-amount">$0.00</p>
-              <span class="caja-badge">ATH Móvil</span>
             </div>
-
             <div class="caja-card">
-              <h3>Total Crédito/Depósito</h3>
+              <h3>Otros</h3>
               <p id="cajaTotalOther" class="caja-amount">$0.00</p>
-              <span class="caja-badge">No efectivo</span>
             </div>
-
             <div class="caja-card total">
               <h3>Total general</h3>
               <p id="cajaTotalAll" class="caja-amount">$0.00</p>
-              <span class="caja-badge">Suma de todo</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ====== PAGE: CONFIG ====== -->
-      <section id="page-config" class="page">
-        <div class="panel wide">
-          <h2>Configuración</h2>
-
-          <div class="field-group">
-            <label class="field-label">Texto del footer</label>
-            <input id="footerTextInput" type="text" class="field-input" value="© 2026 Nexus Transport — Cuadres" />
-          </div>
-
-          <div class="field-group">
-            <label class="field-label">Cambiar PIN ADMIN (maestro)</label>
-            <div class="grid-2">
-              <input id="newPinInput" type="password" maxlength="6" class="field-input" placeholder="Nuevo PIN" />
-              <button id="changePinBtn" class="btn btn-outline">Guardar PIN</button>
-            </div>
-            <p id="pinChangeMessage" class="msg-info small"></p>
-          </div>
-
-          <!-- ADMIN: Choferes -->
-          <div id="adminArea" class="field-group">
-            <h3>Administración: Choferes (PIN)</h3>
-            <p class="msg-info small">
-              Admin puede crear choferes con <strong>Nombre + PIN</strong>. El chofer entra por la pantalla PIN.
-            </p>
-
-            <div class="grid-2">
-              <div class="field-group">
-                <label class="field-label">Nombre</label>
-                <input id="staffNameInput" type="text" class="field-input" placeholder="Ej. Adolfo">
-              </div>
-              <div class="field-group">
-                <label class="field-label">PIN chofer</label>
-                <input id="staffPinInput" type="password" maxlength="6" class="field-input" placeholder="1234">
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button id="addStaffBtn" class="btn btn-primary">Añadir / Actualizar</button>
-              <button id="resetStaffBtn" class="btn btn-text">Limpiar</button>
-            </div>
-
-            <div class="table-wrap" style="margin-top:12px;">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Chofer</th>
-                    <th>PIN</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody id="staffTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      <!-- ====== PAGE: RESUMEN (admin) ====== -->
+      <!-- ================= RESUMEN (ADMIN) ================= -->
       <section id="page-resumen" class="page">
         <div class="panel wide">
           <div class="panel-header">
-            <h2>Resumen (admin)</h2>
-            <p class="panel-subtitle">Aquí va el resumen por chofer, semana (Jue→Jue), compañía y totales.</p>
+            <h2>Resumen</h2>
+            <p class="panel-subtitle">Agrupa por categoría (cantidad, millas y total $)</p>
           </div>
 
           <div class="filters-row">
@@ -432,12 +382,155 @@
 
           <div class="caja-summary-grid">
             <div class="caja-card total">
-              <h3>Total del período</h3>
+              <h3>Total general</h3>
               <p id="sumGrandTotal" class="caja-amount">$0.00</p>
-              <span class="caja-badge">Suma de todo lo filtrado</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= COMISIONES (ADMIN) ================= -->
+      <section id="page-comisiones" class="page">
+        <div class="panel wide">
+          <div class="panel-header">
+            <h2>Comisiones</h2>
+            <p class="panel-subtitle">
+              Calcula: Descuento (% chofer) + Retención (%). Neto = Descuento - Retención.
+            </p>
+          </div>
+
+          <div class="filters-row">
+            <div class="filter-group">
+              <label>Desde</label>
+              <input id="comiStart" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Hasta</label>
+              <input id="comiEnd" type="date" class="field-input small">
+            </div>
+            <div class="filter-group">
+              <label>Chofer</label>
+              <select id="comiDriver" class="field-input small"></select>
+            </div>
+            <div class="filter-group filter-actions">
+              <button id="comiApplyBtn" class="btn btn-small btn-primary">Aplicar</button>
+              <button id="comiClearBtn" class="btn btn-small btn-text">Limpiar</button>
             </div>
           </div>
 
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Chofer</th>
+                  <th>Total servicios $</th>
+                  <th>% Descuento</th>
+                  <th>Descuento $</th>
+                  <th>% Retención</th>
+                  <th>Retención $</th>
+                  <th>Neto a pagar</th>
+                </tr>
+              </thead>
+              <tbody id="comiTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="caja-summary-grid">
+            <div class="caja-card total">
+              <h3>Neto total</h3>
+              <p id="comiGrandTotal" class="caja-amount">$0.00</p>
+              <span class="caja-badge">Suma neta del filtro actual</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CONFIG (ADMIN) ================= -->
+      <section id="page-config" class="page">
+        <div class="panel wide">
+          <h2>Configuración</h2>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label class="field-label">Texto footer</label>
+              <input id="footerTextInput" type="text" class="field-input" value="© 2026 Nexus Transport — Cuadres" />
+              <p class="msg-info small">Se refleja abajo en la app.</p>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Cambiar PIN Admin</label>
+              <div class="grid-2">
+                <input id="newPinInput" type="password" maxlength="6" class="field-input" placeholder="Nuevo PIN" />
+                <button id="changePinBtn" class="btn btn-outline">Guardar PIN</button>
+              </div>
+              <p id="pinChangeMessage" class="msg-info small"></p>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label class="field-label">% Descuento Default (chofer)</label>
+              <input id="defaultRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="30" />
+              <p class="msg-info small">Ej: 30% (0.30) en tu hoja.</p>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">% Retención Default</label>
+              <input id="retentionRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="10" />
+              <p class="msg-info small">Ej: 10% en tu hoja.</p>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Permisos (Chofer)</label>
+              <div class="check-row">
+                <input id="allowDriverEdit" type="checkbox">
+                <label for="allowDriverEdit">Permitir que chofer edite servicios</label>
+              </div>
+              <p class="msg-info small">Si está OFF, solo admin puede editar/eliminar.</p>
+            </div>
+          </div>
+
+          <hr class="hr-soft">
+
+          <!-- ADMIN AREA -->
+          <div id="adminArea" class="field-group">
+            <h3>Choferes (Nombre + PIN + %)</h3>
+            <p class="msg-info small">Crea choferes, asigna su PIN y % de descuento/comisión.</p>
+
+            <div class="grid-3">
+              <div class="field-group">
+                <label class="field-label">Nombre</label>
+                <input id="staffNameInput" type="text" class="field-input" placeholder="Ej. Adolfo Mejia">
+              </div>
+              <div class="field-group">
+                <label class="field-label">PIN</label>
+                <input id="staffPinInput" type="password" maxlength="6" class="field-input" placeholder="1234">
+              </div>
+              <div class="field-group">
+                <label class="field-label">% Descuento</label>
+                <input id="staffRateInput" type="number" min="0" max="100" step="0.1" class="field-input" placeholder="30">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button id="addStaffBtn" class="btn btn-primary">Añadir / Actualizar</button>
+              <button id="resetStaffBtn" class="btn btn-text">Limpiar</button>
+            </div>
+
+            <div class="table-wrap" style="margin-top:12px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Chofer</th>
+                    <th>PIN</th>
+                    <th>%</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -454,6 +547,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
 
   <!-- App -->
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

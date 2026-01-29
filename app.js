@@ -1,15 +1,16 @@
 /* =========================================================
-   Nexus Transport PR — app.js (PRO FIX BOTONES)
+   Nexus Transport PR — app.js (PRO FIX)
    - Delegación global de clicks: tabs + recargar + salir
    - Firebase Auth (Google) + Firestore (v8)
    - PIN (hash SHA-256)
    - Roles: admin / driver
+   - Fix: buildInvoice completo + Driver PDF + CSV + deleteMany
    ========================================================= */
 
 (() => {
   "use strict";
 
-  const NTPR_APP_VERSION = "2.2.0-FIX-BUTTONS";
+  const NTPR_APP_VERSION = "2.3.0-PRO-FIX";
 
   /* =========================
      0) Firebase Config
@@ -62,6 +63,23 @@
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
   function toast(msg){ alert(msg); }
+
+  function csvEscape(v){
+    const s = String(v ?? "");
+    if (/[",\n]/.test(s)) return `"${s.replaceAll('"','""')}"`;
+    return s;
+  }
+
+  function downloadText(filename, text, mime="text/plain"){
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   /* =========================
      2) Cache
@@ -152,8 +170,7 @@
   }
 
   /* =========================
-     8) ✅ EVENT DELEGATION (FIX BOTONES)
-     - No dependemos de listeners “pegados” antes de tiempo
+     8) ✅ EVENT DELEGATION
   ========================= */
   document.addEventListener("click", async (e)=>{
     const tab = e.target.closest?.(".tab[data-view]");
@@ -210,9 +227,21 @@
       await renderDriverHistory();
       return;
     }
+    if (e.target.closest?.("#btnDrvPDF")){
+      await driverPDF();
+      return;
+    }
 
     if (e.target.closest?.("#btnSvcFilter")){
       await renderServicesAdmin();
+      return;
+    }
+    if (e.target.closest?.("#btnSvcCSV")){
+      await exportServicesCSV();
+      return;
+    }
+    if (e.target.closest?.("#btnSvcDeleteMany")){
+      await deleteManyServices();
       return;
     }
 
@@ -468,7 +497,7 @@
   });
 
   /* =========================
-     13) PIN actions (delegated)
+     13) PIN actions
   ========================= */
   async function onPinConfirm(){
     if ($("pinError")) $("pinError").textContent = "";
@@ -643,7 +672,7 @@
   }
 
   /* =========================
-     17) Driver History
+     17) Driver History + PDF
   ========================= */
   async function queryMyRange(fromISO, toISO){
     if (!S.user) return [];
@@ -741,9 +770,52 @@
     return rows;
   }
 
+  async function driverPDF(){
+    if (!S.user) return toast("Primero inicia sesión.");
+    const rows = await renderDriverHistory();
+
+    if (!window.jspdf) return toast("jsPDF no cargó.");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"pt", format:"letter" });
+
+    const from = $("drvFrom")?.value || "1900-01-01";
+    const to   = $("drvTo")?.value || todayISO();
+    const mode = $("drvGroup")?.value || "none";
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(16);
+    doc.text(`${S.settings.brand} — Historial Chofer`, 40, 50);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.text(`Chofer: ${S.profile?.email || S.user.email || ""}`, 40, 70);
+    doc.text(`Rango: ${from} a ${to} | Vista: ${mode}`, 40, 84);
+
+    let y = 110;
+    doc.setFont("helvetica","bold"); doc.setFontSize(10);
+    doc.text("Fecha", 40, y);
+    doc.text("Cliente", 140, y);
+    doc.text("Millas", 420, y, { align: "right" });
+    doc.text("Neto", 520, y, { align: "right" });
+    y += 12;
+    doc.setFont("helvetica","normal");
+
+    const limit = 38;
+    const slice = rows.slice(0, limit);
+    slice.forEach(r=>{
+      doc.text(String(r.dateISO||""), 40, y);
+      doc.text(String(r.clientName||"").slice(0,28), 140, y);
+      doc.text(String(round2(r.miles||0).toFixed(1)), 420, y, { align: "right" });
+      doc.text(String(money(r.driverNet||0)), 520, y, { align: "right" });
+      y += 12;
+    });
+
+    if (rows.length > limit){
+      doc.text(`(Mostrando ${limit} de ${rows.length} registros)`, 40, y+10);
+    }
+
+    doc.save(`historial_chofer_${from}_${to}.pdf`);
+  }
+
   /* =========================
-     18) Admin: Users/Clients/Services/Close/Invoices/Settings
-     (tu estructura se mantiene; delegación ya resuelve botones)
+     18) Admin
   ========================= */
   async function renderUsers(){
     if (S.role !== "admin") return;
@@ -902,6 +974,46 @@
     S._adminSvcRows = rows;
   }
 
+  async function exportServicesCSV(){
+    if (S.role !== "admin") return;
+    if (!S._adminSvcRows?.length) await renderServicesAdmin();
+
+    const rows = S._adminSvcRows || [];
+    if (!rows.length) return toast("No hay datos para exportar.");
+
+    const header = [
+      "dateISO","weekISO","driverEmail","clientName","miles","bruto","connectAdj","company","retention","driverNet","note"
+    ];
+
+    const lines = [header.join(",")];
+    rows.forEach(r=>{
+      lines.push(header.map(k=>csvEscape(r[k])).join(","));
+    });
+
+    const week = $("sWeek")?.value || "all";
+    downloadText(`services_${week}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+  }
+
+  async function deleteManyServices(){
+    if (S.role !== "admin") return;
+
+    const checks = $$(`[data-pick-svc]`).filter(x=>x.checked);
+    if (!checks.length) return toast("No seleccionaste servicios.");
+
+    if (!confirm(`Vas a borrar ${checks.length} servicios. ¿Seguro?`)) return;
+
+    const batch = db.batch();
+    checks.forEach(ch=>{
+      const id = ch.getAttribute("data-pick-svc");
+      if (id) batch.delete(db.collection(C.SERVICES).doc(id));
+    });
+    await batch.commit();
+
+    toast("Borrados ✅");
+    await renderServicesAdmin();
+    await renderDashboard();
+  }
+
   async function weeklyData(weekISO, driverUid){
     let q = db.collection(C.SERVICES).where("weekISO","==",weekISO);
     if (driverUid) q = q.where("driverUid","==",driverUid);
@@ -995,21 +1107,34 @@
         <h3>Factura — ${escapeHtml(S.settings.brand)}</h3>
         <div class="muted">Cliente: <b>${escapeHtml(client?.name||"")}</b> • Semana: <b>${escapeHtml(weekISO)}</b></div>
         <div class="hr"></div>
+        <div class="row"><span>Servicios</span><b>${rows.length}</b></div>
         <div class="row"><span>Total Bruto</span><b>${money(bruto)}</b></div>
         ${(client?.connect) ? `<div class="row"><span>Ajuste Connect</span><b>-${money(connectAdj)}</b></div>` : ""}
         <div class="row"><span><b>Total a facturar</b></span><b>${money(total)}</b></div>
+        <div class="hr"></div>
+        <div class="muted">${escapeHtml(S.settings.footer||"")}</div>
       `;
     }
 
     if (!exportPdf) return;
+
     if (!window.jspdf) return toast("jsPDF no cargó.");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit:"pt", format:"letter" });
+
     doc.setFont("helvetica","bold"); doc.setFontSize(16);
     doc.text(`Factura — ${S.settings.brand}`, 40, 50);
     doc.setFont("helvetica","normal"); doc.setFontSize(10);
     doc.text(`Cliente: ${client?.name||""} | Semana: ${weekISO}`, 40, 70);
-    doc.text(`Total a facturar: ${money(total)}`, 40, 100);
+
+    doc.text(`Servicios: ${rows.length}`, 40, 100);
+    doc.text(`Total bruto: ${money(bruto)}`, 40, 114);
+    if (client?.connect) doc.text(`Ajuste Connect: -${money(connectAdj)}`, 40, 128);
+    doc.setFont("helvetica","bold");
+    doc.text(`Total a facturar: ${money(total)}`, 40, 148);
+    doc.setFont("helvetica","normal");
+    doc.text(`${S.settings.footer||""}`, 40, 170);
+
     doc.save(`factura_${weekISO}_${(client?.name||"cliente").replaceAll(" ","_")}.pdf`);
   }
 

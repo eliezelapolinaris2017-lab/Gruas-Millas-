@@ -1,10 +1,21 @@
+/* =========================================================
+   Nexus Transport PR — app.js (PRODUCCIÓN FIX)
+   - Firebase Auth (Google) + Firestore (v8)
+   - PIN (hash SHA-256)
+   - Roles: admin / driver
+   - Driver: escribe + ve su historial
+   - Admin: usuarios, clientes, settings, servicios, cierres, facturas + PDFs
+   - FIX: Login visible cuando NO hay sesión (app NO se oculta)
+   ========================================================= */
+
 (() => {
   "use strict";
 
-  const NTPR_APP_VERSION = "2.0.0";
-  console.log("NTPR_APP_VERSION:", NTPR_APP_VERSION);
+  const NTPR_APP_VERSION = "2.1.0-FIX";
 
-  // ===== Firebase config (TU PROYECTO NUEVO) =====
+  /* =========================
+     0) Firebase Config (NUEVO)
+  ========================= */
   const firebaseConfig = {
     apiKey: "AIzaSyDGoSNKi1wapE1SpHxTc8wNZGGkJ2nQj7s",
     authDomain: "nexus-transport-2887b.firebaseapp.com",
@@ -14,316 +25,1178 @@
     appId: "1:972915419764:web:7d61dfb03bbe56df867f21"
   };
 
-  // UID maestro (tu UID)
-  const MASTER_ADMIN_UID = "cLXayqw0dhWPDkuozjA2G3k7d4z1";
-
-  // ===== DOM =====
-  const $ = (id) => document.getElementById(id);
-
-  const views = {
-    login: $("view-login"),
-    dashboard: $("view-dashboard"),
-    driver: $("view-driver"),
-    adminUsers: $("view-adminUsers"),
-    adminClients: $("view-adminClients"),
-    adminServices: $("view-adminServices")
-  };
-
-  const topbar = $("topbar");
-  const appMain = $("app");
-  const whoLine = $("whoLine");
-  const rolePill = $("rolePill");
-
-  // ===== Error banner (injected) =====
-  const errBar = document.createElement("div");
-  errBar.style.cssText = `
-    position:fixed; left:12px; right:12px; bottom:12px; z-index:99999;
-    background:rgba(255,0,0,.12); border:1px solid rgba(255,0,0,.35);
-    color:#fff; padding:10px 12px; border-radius:12px; display:none;
-    font-family:system-ui; font-size:13px;
-  `;
-  document.body.appendChild(errBar);
-
-  function showError(msg, err){
-    const detail = err?.message ? ` — ${err.message}` : "";
-    errBar.textContent = `ERROR: ${msg}${detail}`;
-    errBar.style.display = "block";
-    console.error(msg, err || "");
-  }
-  function clearError(){ errBar.style.display = "none"; errBar.textContent = ""; }
-
-  function setView(name){
-    Object.values(views).forEach(v => v && v.classList.remove("active"));
-    views[name]?.classList.add("active");
-
-    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
-    document.querySelector(`.tab[data-view="${name}"]`)?.classList.add("active");
-  }
-
-  function setShell(ready){
-    if (topbar) topbar.hidden = !ready;
-    if (appMain) appMain.hidden = !ready;
-  }
-
-  function guard(id){
-    const el = $(id);
-    if (!el) console.warn("Missing element:", id);
-    return el;
-  }
-
-  // ===== Firebase init =====
-  let auth, db;
-  try {
-    firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-    db = firebase.firestore();
-    console.log("Firebase inicializado:", firebaseConfig.projectId);
-  } catch (e) {
-    showError("Firebase init falló", e);
+  // Init Firebase (safe)
+  if (!window.firebase) {
+    alert("Firebase SDK no cargó. Revisa los <script> en index.html.");
     return;
   }
+  if (!firebase.apps || !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
 
-  // ===== State =====
-  const S = {
-    user: null,
-    profile: null,
-    role: null,
-    entered: false
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+
+  console.log("NTPR_APP_VERSION:", NTPR_APP_VERSION);
+  console.log("Firebase inicializado:", firebaseConfig.projectId);
+
+  /* =========================
+     1) Helpers
+  ========================= */
+  const $ = (id)=>document.getElementById(id);
+  const $$ = (sel)=>Array.from(document.querySelectorAll(sel));
+
+  const num = (v)=> {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const round2 = (n)=> Math.round((num(n) + Number.EPSILON) * 100) / 100;
+  const money = (n)=> round2(n).toLocaleString("en-US",{style:"currency",currency:"USD"});
+  const todayISO = ()=> new Date().toISOString().slice(0,10);
+
+  const mondayOf = (iso)=>{
+    const d = new Date(`${iso}T00:00:00`);
+    const day = d.getDay(); // 0 Sun
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return d.toISOString().slice(0,10);
   };
 
-  // ===== Collections =====
+  const escapeHtml = (s)=> String(s ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  function toast(msg){ alert(msg); }
+
+  /* =========================
+     2) Cache Keys
+  ========================= */
+  const CACHE = {
+    SETTINGS: "ntpr.settings.cache.v1",
+    CLIENTS:  "ntpr.clients.cache.v1",
+    USERS:    "ntpr.users.cache.v1"
+  };
+
+  const loadJSON = (k, fb)=>{
+    try{ const r = localStorage.getItem(k); return r ? JSON.parse(r) : fb; } catch { return fb; }
+  };
+  const saveJSON = (k, v)=> localStorage.setItem(k, JSON.stringify(v));
+
+  /* =========================
+     3) Firestore Collections
+  ========================= */
   const C = {
     USERS: "users",
     INVITES: "invites",
     CLIENTS: "clients",
-    SERVICES: "services"
+    SERVICES: "services",
+    SETTINGS: "settings" // doc "global"
   };
 
-  // ===== UI Buttons =====
-  $("btnGoogleLogin")?.addEventListener("click", async ()=>{
-    clearError();
-    try{
-      const prov = new firebase.auth.GoogleAuthProvider();
-      await auth.signInWithPopup(prov);
-    }catch(e){
-      showError("Login Google bloqueado. Revisa Authorized Domains en Firebase Auth.", e);
-    }
-  });
+  /* =========================
+     4) Default Settings
+  ========================= */
+  const DEFAULT_SETTINGS = {
+    brand: "Nexus Transport PR",
+    footer: "Resumen generado por Nexus Transport PR",
+    connectPct: 0.15,
+    companyPct: 0.30,
+    retentionPct: 0.10
+  };
 
-  $("btnLogout")?.addEventListener("click", ()=>auth.signOut());
-  $("btnReload")?.addEventListener("click", ()=>location.reload());
+  /* =========================
+     5) State
+  ========================= */
+  const S = {
+    user: null,
+    profile: null,
+    role: null,
 
-  // ===== PIN helpers (simple) =====
+    settings: { ...DEFAULT_SETTINGS },
+    clients: [],
+    users: [],
+
+    selectedUserUid: null,
+    selectedClientId: null,
+
+    _adminSvcRows: []
+  };
+
+  /* =========================
+     6) Crypto (PIN Hash)
+     hash = sha256(uid + ":" + pin)
+  ========================= */
   async function sha256Hex(text){
     const enc = new TextEncoder().encode(text);
     const buf = await crypto.subtle.digest("SHA-256", enc);
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
   }
   async function pinHash(uid, pin){
-    return sha256Hex(`${uid}:${String(pin||"")}`);
+    return sha256Hex(`${uid}:${String(pin || "")}`);
   }
 
-  $("btnPinConfirm")?.addEventListener("click", async ()=>{
-    clearError();
-    const pin = ($("pinInput")?.value || "").trim();
-    if (!pin) return (guard("pinError").textContent = "PIN requerido.");
+  /* =========================
+     7) UI Navigation
+  ========================= */
+  function setView(name){
+    $$(".view").forEach(v=>v.classList.remove("active"));
+    $(`view-${name}`)?.classList.add("active");
 
-    try{
-      const h = await pinHash(S.user.uid, pin);
-      if (h !== (S.profile?.pinHash || "")) {
-        guard("pinError").textContent = "PIN incorrecto.";
+    $$(".tab").forEach(t=>t.classList.remove("active"));
+    document.querySelector(`.tab[data-view="${name}"]`)?.classList.add("active");
+  }
+
+  // ✅ FIX CLAVE:
+  // - App SIEMPRE visible (para mostrar login cuando NO hay sesión)
+  // - Topbar solo visible cuando hay sesión
+  function setShell(authenticated){
+    const top = $("topbar");
+    const app = $("app");
+
+    if (top) top.hidden = !authenticated;
+    if (app) app.hidden = false; // <<< NO LO ESCONDAS. Aquí vive el login.
+
+    // seguridad visual: si no hay sesión, forzamos login
+    if (!authenticated) setView("login");
+  }
+
+  function setAdminTabsVisible(isAdmin){
+    const ids = ["tabAdminUsers","tabAdminClients","tabAdminServices","tabAdminClose","tabAdminInvoices","tabAdminSettings"];
+    ids.forEach(id => { const el = $(id); if (el) el.style.display = isAdmin ? "" : "none"; });
+  }
+
+  // Tabs click: no corras dashboard si no hay sesión
+  $$("#navTabs .tab[data-view]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const v = btn.dataset.view;
+      if (!v) return;
+
+      if (!S.user) { setView("login"); return; } // ✅ anti-crash
+
+      const isAdminView = v.startsWith("admin");
+      if (isAdminView && S.role !== "admin") return;
+
+      setView(v);
+      await refreshView(v);
+    });
+  });
+
+  /* =========================
+     8) Fill Selects
+  ========================= */
+  function fillClients(selectId){
+    const el = $(selectId);
+    if (!el) return;
+
+    const list = S.clients.filter(c=>c.active !== false).slice()
+      .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+
+    el.innerHTML = `<option value="">—</option>` + list.map(c =>
+      `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+    ).join("");
+  }
+
+  function fillDrivers(selectId){
+    const el = $(selectId);
+    if (!el) return;
+
+    const list = S.users.filter(u=>u.role==="driver" && u.active !== false).slice()
+      .sort((a,b)=>String(a.email||"").localeCompare(String(b.email||"")));
+
+    el.innerHTML = `<option value="">—</option>` + list.map(u =>
+      `<option value="${u.uid}">${escapeHtml(u.email || u.uid)}</option>`
+    ).join("");
+  }
+
+  /* =========================
+     9) Settings / Clients / Users Load
+  ========================= */
+  async function ensureGlobalSettings(){
+    const ref = db.collection(C.SETTINGS).doc("global");
+    const snap = await ref.get();
+    if (snap.exists) return;
+
+    await ref.set({
+      ...DEFAULT_SETTINGS,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+  }
+
+  async function loadSettings(force=false){
+    if (!force) {
+      S.settings = { ...DEFAULT_SETTINGS, ...(loadJSON(CACHE.SETTINGS, {})) };
+      return;
+    }
+    await ensureGlobalSettings();
+    const snap = await db.collection(C.SETTINGS).doc("global").get();
+    S.settings = { ...DEFAULT_SETTINGS, ...(snap.data()||{}) };
+    saveJSON(CACHE.SETTINGS, S.settings);
+  }
+
+  async function ensureMinimumClients(){
+    const snap = await db.collection(C.CLIENTS).limit(1).get();
+    if (!snap.empty) return;
+
+    const batch = db.batch();
+    const defaults = [
+      { name:"Connect", rate: 1.00, connect:true,  active:true },
+      { name:"Dealer",  rate: 1.00, connect:false, active:true },
+      { name:"Privado", rate: 1.00, connect:false, active:true },
+      { name:"AAA",     rate: 1.00, connect:false, active:true }
+    ];
+    defaults.forEach(c=>{
+      const doc = db.collection(C.CLIENTS).doc();
+      batch.set(doc, { ...c, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+  }
+
+  async function loadClients(force=false){
+    if (!force) {
+      S.clients = loadJSON(CACHE.CLIENTS, []);
+      return;
+    }
+    await ensureMinimumClients();
+    const snap = await db.collection(C.CLIENTS).get();
+    S.clients = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    saveJSON(CACHE.CLIENTS, S.clients);
+  }
+
+  async function loadUsers(force=false){
+    if (!force) {
+      S.users = loadJSON(CACHE.USERS, []);
+      return;
+    }
+    const snap = await db.collection(C.USERS).get();
+    S.users = snap.docs.map(d=>({ uid:d.id, ...d.data() }));
+    saveJSON(CACHE.USERS, S.users);
+  }
+
+  /* =========================
+     10) Auth + Bootstrap
+  ========================= */
+  $("btnGoogleLogin")?.addEventListener("click", async ()=>{
+    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  });
+
+  $("btnLogout")?.addEventListener("click", ()=>auth.signOut());
+  $("btnReload")?.addEventListener("click", ()=>location.reload());
+
+  auth.onAuthStateChanged(async (user)=>{
+    $("pinError") && ($("pinError").textContent = "");
+    $("pinSetError") && ($("pinSetError").textContent = "");
+    $("loginMsg") && ($("loginMsg").textContent = "—");
+
+    if (!user){
+      S.user=null; S.profile=null; S.role=null;
+
+      // ✅ FIX: muestra login (app visible, topbar oculto)
+      setShell(false);
+      $("loginMsg") && ($("loginMsg").textContent = "Inicia sesión con Google");
+      return;
+    }
+
+    S.user = user;
+    setShell(true);
+    setView("login");
+
+    $("loginMsg") && ($("loginMsg").textContent = "Google OK. Validando acceso...");
+
+    const uref = db.collection(C.USERS).doc(user.uid);
+    const usnap = await uref.get();
+
+    if (!usnap.exists){
+      const email = (user.email || "").toLowerCase();
+      if (!email) {
+        $("loginMsg") && ($("loginMsg").textContent = "Email no disponible. Reintenta.");
         return;
       }
-      await afterEnter();
-    } catch(e){
-      showError("Validación de PIN falló", e);
-    }
-  });
-
-  $("btnPinSet")?.addEventListener("click", async ()=>{
-    clearError();
-    const p1 = ($("pinNew")?.value || "").trim();
-    const p2 = ($("pinNew2")?.value || "").trim();
-    if (!p1 || !p2) return (guard("pinSetError").textContent = "Completa ambos campos.");
-    if (p1 !== p2) return (guard("pinSetError").textContent = "PIN no coincide.");
-    if (p1.length < 4) return (guard("pinSetError").textContent = "PIN mínimo 4 dígitos.");
-
-    try{
-      const h = await pinHash(S.user.uid, p1);
-      await db.collection(C.USERS).doc(S.user.uid).set({
-        pinHash: h,
-        pinUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge:true });
-
-      const snap = await db.collection(C.USERS).doc(S.user.uid).get();
-      S.profile = snap.data() || {};
-      S.role = S.profile.role || "driver";
-
-      await afterEnter();
-    } catch(e){
-      showError("Guardar PIN falló (rules/firestore)", e);
-    }
-  });
-
-  // ===== Bootstrap user =====
-  async function ensureUserDoc(user){
-    const uref = db.collection(C.USERS).doc(user.uid);
-    let snap;
-
-    try { snap = await uref.get(); }
-    catch(e){ throw new Error("No puedo leer users/{uid}. Revisa Firestore Rules/DB."); }
-
-    // Bootstrap admin maestro
-    if (!snap.exists && user.uid === MASTER_ADMIN_UID){
-      await uref.set({
-        email: (user.email||"").toLowerCase(),
-        displayName: user.displayName || "",
-        role: "admin",
-        active: true,
-        pinHash: "",
-        master: true,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge:true });
-      snap = await uref.get();
-    }
-
-    // Invitación por email si no existe
-    if (!snap.exists){
-      const email = (user.email||"").toLowerCase();
-      if (!email) throw new Error("Email no disponible en Google Auth.");
 
       const inv = await db.collection(C.INVITES).doc(email).get();
-      if (!inv.exists) throw new Error("No autorizado. Falta invite en /invites/{email}.");
+      if (!inv.exists){
+        $("loginMsg") && ($("loginMsg").textContent = "No autorizado. Admin debe invitar tu email.");
+        return;
+      }
 
-      const d = inv.data() || {};
-      if (d.active === false) throw new Error("Invitación inactiva.");
+      const invData = inv.data() || {};
+      if (invData.active === false){
+        $("loginMsg") && ($("loginMsg").textContent = "Invitación inactiva.");
+        return;
+      }
 
       await uref.set({
         email,
         displayName: user.displayName || "",
-        role: d.role || "driver",
-        active: d.active !== false,
+        role: invData.role || "driver",
+        active: invData.active !== false,
         pinHash: "",
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge:true });
 
-      snap = await uref.get();
+      $("loginMsg") && ($("loginMsg").textContent = "Usuario creado. Ahora crea tu PIN.");
     }
 
-    return snap.data() || {};
-  }
+    const fresh = await uref.get();
+    S.profile = fresh.data();
+    S.role = S.profile.role || "driver";
+
+    $("whoLine") && ($("whoLine").textContent = `${S.profile.email || user.email || "—"}`);
+    $("rolePill") && ($("rolePill").textContent = (S.role || "—").toUpperCase());
+
+    setAdminTabsVisible(S.role === "admin");
+
+    await loadSettings(true);
+    await loadClients(true);
+    if (S.role === "admin") await loadUsers(true);
+
+    fillClients("qsClient");
+    fillClients("sClient");
+    fillClients("invClient");
+    fillDrivers("sDriver");
+    fillDrivers("wkDriver");
+
+    if ($("qsDate")) $("qsDate").value = todayISO();
+    if ($("drvFrom") && !$("drvFrom").value) $("drvFrom").value = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+    if ($("drvTo") && !$("drvTo").value) $("drvTo").value = todayISO();
+    if ($("sWeek")) $("sWeek").value = mondayOf(todayISO());
+    if ($("wkStart")) $("wkStart").value = mondayOf(todayISO());
+    if ($("invWeek")) $("invWeek").value = mondayOf(todayISO());
+
+    prefillSettingsForm();
+
+    if (!S.profile.pinHash){
+      $("loginMsg") && ($("loginMsg").textContent = "Crea tu PIN (primera vez) y entra.");
+    } else {
+      $("loginMsg") && ($("loginMsg").textContent = "Confirma tu PIN para entrar.");
+    }
+  });
+
+  /* =========================
+     11) PIN actions
+  ========================= */
+  $("btnPinConfirm")?.addEventListener("click", async ()=>{
+    $("pinError") && ($("pinError").textContent = "");
+    if (!S.user || !S.profile) return;
+
+    const pin = ($("pinInput").value || "").trim();
+    if (!pin) { $("pinError").textContent = "PIN requerido."; return; }
+
+    const actual = await pinHash(S.user.uid, pin);
+    if (actual !== (S.profile.pinHash || "")) {
+      $("pinError").textContent = "PIN incorrecto.";
+      return;
+    }
+
+    await afterEnter();
+  });
+
+  $("btnPinSet")?.addEventListener("click", async ()=>{
+    $("pinSetError") && ($("pinSetError").textContent = "");
+    if (!S.user) return;
+
+    const p1 = ($("pinNew").value || "").trim();
+    const p2 = ($("pinNew2").value || "").trim();
+    if (!p1 || !p2) { $("pinSetError").textContent = "Completa ambos campos."; return; }
+    if (p1 !== p2) { $("pinSetError").textContent = "PIN no coincide."; return; }
+    if (p1.length < 4) { $("pinSetError").textContent = "PIN mínimo 4 dígitos."; return; }
+
+    const h = await pinHash(S.user.uid, p1);
+    await db.collection(C.USERS).doc(S.user.uid).set({
+      pinHash: h,
+      pinUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    const fresh = await db.collection(C.USERS).doc(S.user.uid).get();
+    S.profile = fresh.data();
+    S.role = S.profile.role || "driver";
+
+    toast("PIN guardado ✅");
+    await afterEnter();
+  });
 
   async function afterEnter(){
-    S.entered = true;
+    if (!S.user) return;
+
+    await loadSettings(true);
+    await loadClients(true);
+    if (S.role === "admin") await loadUsers(true);
+
+    fillClients("qsClient");
+    fillClients("sClient");
+    fillClients("invClient");
+    fillDrivers("sDriver");
+    fillDrivers("wkDriver");
+
+    prefillSettingsForm();
+
     setShell(true);
-
-    // Admin tabs
-    const adminTabs = ["tabAdminUsers","tabAdminClients","tabAdminServices"];
-    adminTabs.forEach(id=>{
-      const el = $(id);
-      if (el) el.style.display = (S.role === "admin") ? "" : "none";
-    });
-
     setView("dashboard");
-    await renderDashboardSafe();
+    await refreshAll();
   }
 
-  // ===== Dashboard render safe =====
-  async function renderDashboardSafe(){
-    clearError();
+  /* =========================
+     12) Engine de cálculo
+  ========================= */
+  function calc(miles, client){
+    const m = round2(num(miles));
+    const rate = round2(num(client.rate));
 
-    if (!S.entered || !S.user) {
-      // No render aún
-      return;
-    }
+    const bruto = round2(m * rate);
+    const connectAdj = client.connect ? round2(bruto * num(S.settings.connectPct)) : 0;
 
-    try{
-      // KPI básicos desde services (si no hay colección, no explota)
-      const wkMiles = $("kpiWeekMiles");
-      const wkServices = $("kpiWeekServices");
-      const wkDriverNet = $("kpiWeekDriverNet");
-      const wkCompany = $("kpiWeekCompany");
+    const netSplit = round2(bruto - connectAdj);
+    const company = round2(netSplit * num(S.settings.companyPct));
+    const driverGross = round2(netSplit - company);
+    const retention = round2(driverGross * num(S.settings.retentionPct));
+    const driverNet = round2(driverGross - retention);
 
-      if (wkMiles) wkMiles.textContent = "0";
-      if (wkServices) wkServices.textContent = "0";
-      if (wkDriverNet) wkDriverNet.textContent = "$0.00";
-      if (wkCompany) wkCompany.textContent = "$0.00";
-
-      // Intento lectura simple: últimos 10 services del usuario (o todos si admin)
-      let q = db.collection(C.SERVICES).orderBy("createdAt","desc").limit(10);
-      if (S.role !== "admin") q = q.where("driverUid","==",S.user.uid);
-
-      const snap = await q.get();
-      const rows = snap.docs.map(d=>d.data());
-
-      if (wkServices) wkServices.textContent = String(rows.length);
-
-      // Recent list
-      const tb = $("dashRecent");
-      if (tb){
-        tb.innerHTML = rows.map(r=>`
-          <tr>
-            <td>${String(r.dateISO||"")}</td>
-            <td>${String(r.clientName||"")}</td>
-            <td>${Number(r.miles||0).toFixed(1)}</td>
-            <td>${Number(r.driverNet||0).toFixed(2)}</td>
-          </tr>
-        `).join("");
-      }
-    }catch(e){
-      showError("Dashboard no puede leer Firestore. 99% Rules/Auth/Firestore DB.", e);
-    }
+    return { m, rate, bruto, connectAdj, netSplit, company, driverGross, retention, driverNet };
   }
 
-  // ===== Tabs click (solo si entered) =====
-  document.querySelectorAll("#navTabs .tab[data-view]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      if (!S.entered) return setView("login");
-      const v = btn.dataset.view;
-      if (!v) return;
-      if (v.startsWith("admin") && S.role !== "admin") return;
-      setView(v);
-      if (v === "dashboard") await renderDashboardSafe();
+  /* =========================
+     13) Quick Save
+  ========================= */
+  $("btnQuickSave")?.addEventListener("click", async ()=>{
+    if (!S.user || !S.profile) return toast("Primero inicia sesión.");
+
+    const dateISO = $("qsDate").value || todayISO();
+    const clientId = $("qsClient").value || "";
+    const miles = num($("qsMiles").value);
+    const note = ($("qsNote").value || "").trim();
+
+    if (!clientId) return toast("Selecciona cliente.");
+    if (miles <= 0) return toast("Millas deben ser > 0.");
+
+    const client = S.clients.find(c=>c.id===clientId && c.active !== false);
+    if (!client) return toast("Cliente inválido.");
+
+    const weekISO = mondayOf(dateISO);
+    const r = calc(miles, client);
+
+    const dayKey = `${S.user.uid}|${dateISO}|${clientId}|${r.m}`;
+
+    const dup = await db.collection(C.SERVICES).where("dayKey","==",dayKey).limit(1).get();
+    if (!dup.empty) return toast("Duplicado detectado (mismo día/cliente/millas).");
+
+    await db.collection(C.SERVICES).add({
+      dayKey,
+      dateISO,
+      weekISO,
+
+      driverUid: S.user.uid,
+      driverEmail: (S.profile.email || S.user.email || ""),
+      driverName: (S.profile.displayName || S.user.displayName || ""),
+
+      clientId: client.id,
+      clientName: client.name,
+      clientRate: r.rate,
+      clientConnect: !!client.connect,
+
+      miles: r.m,
+      bruto: r.bruto,
+      connectAdj: r.connectAdj,
+      netSplit: r.netSplit,
+      company: r.company,
+      driverGross: r.driverGross,
+      retention: r.retention,
+      driverNet: r.driverNet,
+
+      note,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    $("qsMiles").value = "";
+    $("qsNote").value = "";
+    $("quickPreview").textContent = "Guardado ✅";
+    await refreshAll();
+  });
+
+  $("btnQuickClear")?.addEventListener("click", ()=>{
+    $("qsMiles").value = "";
+    $("qsNote").value = "";
+    $("quickPreview").textContent = "—";
+  });
+
+  ["qsClient","qsMiles"].forEach(id=>{
+    $(id)?.addEventListener("input", ()=>{
+      const cid = $("qsClient").value || "";
+      const miles = num($("qsMiles").value);
+      const client = S.clients.find(c=>c.id===cid);
+      if (!client || miles<=0){ $("quickPreview").textContent = "—"; return; }
+      const r = calc(miles, client);
+      $("quickPreview").textContent =
+        `Bruto ${money(r.bruto)} | Adj Connect ${money(r.connectAdj)} | Neto chofer ${money(r.driverNet)} | Empresa ${money(r.company)}`;
     });
   });
 
-  // ===== Auth state =====
-  auth.onAuthStateChanged(async (user)=>{
-    clearError();
-    S.entered = false;
-    S.user = user;
-    S.profile = null;
-    S.role = null;
+  /* =========================
+     14) Dashboard
+  ========================= */
+  async function queryWeekServices(weekISO){
+    // ✅ anti-crash (tu error de "uid")
+    if (!S.user) return [];
 
-    // Siempre arrancar bloqueado
-    setShell(false);
-    setView("login");
+    let q = db.collection(C.SERVICES).where("weekISO","==",weekISO);
+    if (S.role !== "admin") q = q.where("driverUid","==",S.user.uid);
 
-    if (!user){
-      guard("loginMsg").textContent = "Inicia sesión con Google";
-      return;
+    const snap = await q.get();
+    return snap.docs.map(d=>({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (a.dateISO < b.dateISO ? 1 : -1));
+  }
+
+  async function renderDashboard(){
+    if (!S.user) { setView("login"); return; }
+
+    const wk = mondayOf(todayISO());
+    $("kpiWeekRange").textContent = `Semana desde ${wk}`;
+
+    const list = await queryWeekServices(wk);
+    const miles = round2(list.reduce((a,s)=>a+num(s.miles),0));
+    const driverNet = round2(list.reduce((a,s)=>a+num(s.driverNet),0));
+    const company = round2(list.reduce((a,s)=>a+num(s.company),0));
+
+    $("kpiWeekMiles").textContent = miles.toFixed(1);
+    $("kpiWeekServices").textContent = String(list.length);
+    $("kpiWeekDriverNet").textContent = money(driverNet);
+    $("kpiWeekCompany").textContent = money(company);
+
+    const tb = $("dashRecent");
+    tb.innerHTML = list.slice(0,20).map(s=>`
+      <tr>
+        <td>${escapeHtml(s.dateISO||"")}</td>
+        <td>${escapeHtml(s.clientName||"")}</td>
+        <td class="num">${round2(s.miles||0)}</td>
+        <td class="num">${money(s.bruto||0)}</td>
+        <td class="num">${money(s.driverNet||0)}</td>
+        <td class="num">${S.role==="admin" ? `<button class="btn danger" data-del="${s.id}">X</button>` : ""}</td>
+      </tr>
+    `).join("");
+
+    if (S.role==="admin"){
+      tb.querySelectorAll("[data-del]").forEach(btn=>{
+        btn.addEventListener("click", async ()=>{
+          const id = btn.getAttribute("data-del");
+          if (!confirm("Borrar servicio?")) return;
+          await db.collection(C.SERVICES).doc(id).delete();
+          await refreshAll();
+        });
+      });
+    }
+  }
+
+  /* =========================
+     15) Driver history + PDF
+  ========================= */
+  async function queryMyRange(fromISO, toISO){
+    if (!S.user) return [];
+
+    let q = db.collection(C.SERVICES)
+      .where("driverUid","==",S.user.uid)
+      .where("dateISO",">=",fromISO)
+      .where("dateISO","<=",toISO);
+
+    const snap = await q.get();
+    return snap.docs.map(d=>({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (a.dateISO < b.dateISO ? 1 : -1));
+  }
+
+  function renderDriverTableHead(mode){
+    const head = $("drvHead");
+    if (!head) return;
+    if (mode==="week"){
+      head.innerHTML = `<tr><th>Semana</th><th class="num">Servicios</th><th class="num">Millas</th><th class="num">Neto</th></tr>`;
+    } else if (mode==="month"){
+      head.innerHTML = `<tr><th>Mes</th><th class="num">Servicios</th><th class="num">Millas</th><th class="num">Neto</th></tr>`;
+    } else {
+      head.innerHTML = `<tr><th>Fecha</th><th>Cliente</th><th class="num">Millas</th><th class="num">Neto</th></tr>`;
+    }
+  }
+
+  function groupByWeek(rows){
+    const map = new Map();
+    rows.forEach(r=>{
+      const k = r.weekISO || mondayOf(r.dateISO);
+      const cur = map.get(k) || { k, count:0, miles:0, net:0 };
+      cur.count += 1;
+      cur.miles += num(r.miles);
+      cur.net   += num(r.driverNet);
+      map.set(k, cur);
+    });
+    return Array.from(map.values()).sort((a,b)=> (a.k < b.k ? 1 : -1));
+  }
+
+  function groupByMonth(rows){
+    const map = new Map();
+    rows.forEach(r=>{
+      const k = String(r.dateISO||"").slice(0,7);
+      const cur = map.get(k) || { k, count:0, miles:0, net:0 };
+      cur.count += 1;
+      cur.miles += num(r.miles);
+      cur.net   += num(r.driverNet);
+      map.set(k, cur);
+    });
+    return Array.from(map.values()).sort((a,b)=> (a.k < b.k ? 1 : -1));
+  }
+
+  async function renderDriverHistory(){
+    if (!S.user) { setView("login"); return []; }
+
+    const from = $("drvFrom").value || "1900-01-01";
+    const to   = $("drvTo").value || todayISO();
+    const mode = $("drvGroup").value || "none";
+
+    const rows = await queryMyRange(from, to);
+    renderDriverTableHead(mode);
+
+    const body = $("drvBody");
+    if (!body) return rows;
+
+    if (mode==="week"){
+      const g = groupByWeek(rows);
+      body.innerHTML = g.map(x=>`
+        <tr>
+          <td>${escapeHtml(x.k)}</td>
+          <td class="num">${x.count}</td>
+          <td class="num">${round2(x.miles).toFixed(1)}</td>
+          <td class="num">${money(x.net)}</td>
+        </tr>
+      `).join("");
+    } else if (mode==="month"){
+      const g = groupByMonth(rows);
+      body.innerHTML = g.map(x=>`
+        <tr>
+          <td>${escapeHtml(x.k)}</td>
+          <td class="num">${x.count}</td>
+          <td class="num">${round2(x.miles).toFixed(1)}</td>
+          <td class="num">${money(x.net)}</td>
+        </tr>
+      `).join("");
+    } else {
+      body.innerHTML = rows.map(r=>`
+        <tr>
+          <td>${escapeHtml(r.dateISO)}</td>
+          <td>${escapeHtml(r.clientName||"")}</td>
+          <td class="num">${round2(r.miles||0).toFixed(1)}</td>
+          <td class="num">${money(r.driverNet||0)}</td>
+        </tr>
+      `).join("");
     }
 
-    guard("loginMsg").textContent = "Google OK. Cargando perfil...";
-    try{
-      const profile = await ensureUserDoc(user);
-      S.profile = profile;
-      S.role = profile.role || "driver";
+    return rows;
+  }
 
-      if (whoLine) whoLine.textContent = (profile.email || user.email || "—");
-      if (rolePill) rolePill.textContent = (S.role || "—").toUpperCase();
+  $("btnDrvFilter")?.addEventListener("click", ()=>renderDriverHistory());
 
-      // Si no hay PIN, pedir crear
-      if (!profile.pinHash){
-        guard("loginMsg").textContent = "Usuario OK. Crea tu PIN para entrar.";
-      } else {
-        guard("loginMsg").textContent = "Usuario OK. Confirma tu PIN para entrar.";
-      }
+  $("btnDrvPDF")?.addEventListener("click", async ()=>{
+    const rows = await renderDriverHistory();
+    const from = $("drvFrom").value || "—";
+    const to   = $("drvTo").value || "—";
 
-    }catch(e){
-      showError("Onboarding falló (Auth/Rules/Firestore)", e);
-      guard("loginMsg").textContent = "Fallo de acceso. Revisa el error abajo.";
-    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"pt", format:"letter" });
+    const mx = 40;
+    let y = 50;
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(16);
+    doc.text(S.settings.brand, mx, y); y+=18;
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.text(`Historial chofer: ${(S.profile?.email||S.user.email||"")}`, mx, y); y+=14;
+    doc.text(`Rango: ${from} → ${to}`, mx, y); y+=18;
+
+    doc.setFont("helvetica","bold"); doc.text("Detalle", mx, y); y+=14;
+    doc.setFont("helvetica","normal");
+
+    const line = (t)=>{
+      doc.text(t, mx, y);
+      y+=12;
+      if (y>740){ doc.addPage(); y=50; }
+    };
+
+    rows.slice().reverse().forEach(r=>{
+      line(`${r.dateISO} | ${r.clientName} | ${round2(r.miles).toFixed(1)} mi | Neto: ${money(r.driverNet)}`);
+    });
+
+    y+=10;
+    doc.setFontSize(9);
+    doc.text(S.settings.footer || "", mx, y);
+
+    doc.save(`historial_${(S.profile?.email||"chofer").replaceAll("@","_")}.pdf`);
   });
 
+  /* =========================
+     16) Admin: Users
+  ========================= */
+  async function renderUsers(){
+    if (S.role !== "admin") return;
+    await loadUsers(true);
+
+    const tb = $("usersTable");
+    if (!tb) return;
+
+    tb.innerHTML = S.users.slice().sort((a,b)=>String(a.email||"").localeCompare(String(b.email||""))).map(u=>`
+      <tr>
+        <td>${escapeHtml(u.email||"")}</td>
+        <td>${escapeHtml(u.role||"")}</td>
+        <td>${u.active !== false ? "Sí":"No"}</td>
+        <td>${escapeHtml(u.uid)}</td>
+        <td>${u.pinHash ? "OK":"—"}</td>
+        <td><button class="btn" data-pick-user="${u.uid}">Seleccionar</button></td>
+      </tr>
+    `).join("");
+
+    tb.querySelectorAll("[data-pick-user]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        S.selectedUserUid = b.getAttribute("data-pick-user");
+        toast(`Usuario seleccionado: ${S.selectedUserUid}`);
+      });
+    });
+
+    fillDrivers("sDriver");
+    fillDrivers("wkDriver");
+  }
+
+  $("btnInviteUser")?.addEventListener("click", async ()=>{
+    if (S.role !== "admin") return;
+
+    const email = ($("uEmail").value || "").trim().toLowerCase();
+    const role = $("uRole").value || "driver";
+    const active = ($("uActive").value || "true") === "true";
+    const note = ($("uNote").value || "").trim();
+
+    if (!email || !email.includes("@")) return toast("Email inválido.");
+
+    await db.collection(C.INVITES).doc(email).set({
+      email, role, active, note,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    toast("Invitación guardada ✅");
+    $("uEmail").value = "";
+    $("uNote").value = "";
+    await renderUsers();
+  });
+
+  $("btnResetPin")?.addEventListener("click", async ()=>{
+    if (S.role !== "admin") return;
+    if (!S.selectedUserUid) return toast("Selecciona un usuario primero.");
+
+    if (!confirm("Reset PIN: el usuario tendrá que crear PIN nuevo al entrar. ¿Seguro?")) return;
+
+    await db.collection(C.USERS).doc(S.selectedUserUid).set({
+      pinHash: "",
+      pinResetAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    toast("PIN reseteado ✅");
+    await renderUsers();
+  });
+
+  /* =========================
+     17) Admin: Clients CRUD
+  ========================= */
+  function prefillClientForm(c){
+    $("cName").value = c?.name || "";
+    $("cRate").value = c?.rate ?? "";
+    $("cConnect").value = c?.connect ? "yes":"no";
+    $("cActive").value = (c?.active !== false) ? "true":"false";
+    S.selectedClientId = c?.id || null;
+  }
+
+  async function renderClients(){
+    if (S.role !== "admin") return;
+    await loadClients(true);
+
+    fillClients("qsClient");
+    fillClients("sClient");
+    fillClients("invClient");
+
+    const tb = $("clientsTable");
+    if (!tb) return;
+
+    const list = S.clients.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+    tb.innerHTML = list.map(c=>`
+      <tr>
+        <td>${escapeHtml(c.name||"")}</td>
+        <td class="num">${money(c.rate||0)}</td>
+        <td>${c.connect ? "Sí":"No"}</td>
+        <td>${c.active !== false ? "Sí":"No"}</td>
+        <td><button class="btn" data-edit-client="${c.id}">Editar</button></td>
+      </tr>
+    `).join("");
+
+    tb.querySelectorAll("[data-edit-client]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const id = b.getAttribute("data-edit-client");
+        const c = S.clients.find(x=>x.id===id);
+        prefillClientForm(c);
+      });
+    });
+  }
+
+  $("btnSaveClient")?.addEventListener("click", async ()=>{
+    if (S.role !== "admin") return;
+
+    const name = ($("cName").value || "").trim();
+    const rate = round2(num($("cRate").value));
+    const connect = ($("cConnect").value || "no") === "yes";
+    const active = ($("cActive").value || "true") === "true";
+
+    if (!name) return toast("Nombre requerido.");
+    if (rate <= 0) return toast("Tarifa debe ser > 0.");
+
+    if (S.selectedClientId){
+      await db.collection(C.CLIENTS).doc(S.selectedClientId).set({
+        name, rate, connect, active,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    } else {
+      await db.collection(C.CLIENTS).add({
+        name, rate, connect, active,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    prefillClientForm(null);
+    toast("Cliente guardado ✅");
+    await renderClients();
+  });
+
+  $("btnClearClient")?.addEventListener("click", ()=>prefillClientForm(null));
+
+  /* =========================
+     18) Admin: Services
+  ========================= */
+  async function queryServicesAdmin(){
+    const week = $("sWeek").value || "";
+    const driverUid = $("sDriver").value || "";
+    const clientId = $("sClient").value || "";
+
+    let q = db.collection(C.SERVICES);
+    if (week) q = q.where("weekISO","==",week);
+    if (driverUid) q = q.where("driverUid","==",driverUid);
+    if (clientId) q = q.where("clientId","==",clientId);
+
+    const snap = await q.get();
+    return snap.docs.map(d=>({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (a.dateISO < b.dateISO ? 1 : -1));
+  }
+
+  async function renderServicesAdmin(){
+    if (S.role !== "admin") return;
+
+    const rows = await queryServicesAdmin();
+    const tb = $("servicesTable");
+    if (!tb) return;
+
+    tb.innerHTML = rows.map(r=>`
+      <tr>
+        <td><input type="checkbox" data-pick-svc="${r.id}"></td>
+        <td>${escapeHtml(r.dateISO||"")}</td>
+        <td>${escapeHtml(r.driverEmail||"")}</td>
+        <td>${escapeHtml(r.clientName||"")}</td>
+        <td class="num">${round2(r.miles||0).toFixed(1)}</td>
+        <td class="num">${money(r.bruto||0)}</td>
+        <td class="num">${money(r.connectAdj||0)}</td>
+        <td class="num">${money(r.company||0)}</td>
+        <td class="num">${money(r.retention||0)}</td>
+        <td class="num">${money(r.driverNet||0)}</td>
+        <td><button class="btn danger" data-del-one="${r.id}">X</button></td>
+      </tr>
+    `).join("");
+
+    tb.querySelectorAll("[data-del-one]").forEach(b=>{
+      b.addEventListener("click", async ()=>{
+        const id = b.getAttribute("data-del-one");
+        if (!confirm("Borrar servicio?")) return;
+        await db.collection(C.SERVICES).doc(id).delete();
+        await renderServicesAdmin();
+      });
+    });
+
+    S._adminSvcRows = rows;
+  }
+
+  $("btnSvcFilter")?.addEventListener("click", ()=>renderServicesAdmin());
+
+  $("btnSvcCSV")?.addEventListener("click", ()=>{
+    if (S.role !== "admin") return;
+    const rows = S._adminSvcRows || [];
+    const header = ["dateISO","driverEmail","clientName","miles","bruto","connectAdj","company","retention","driverNet","note"];
+    const out = [header.join(",")].concat(rows.map(r=> header.map(k=>{
+      const v = (r[k] ?? "");
+      return String(v).replaceAll(","," ");
+    }).join(",")));
+    const blob = new Blob([out.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "services_export.csv";
+    a.click();
+  });
+
+  $("btnSvcDeleteMany")?.addEventListener("click", async ()=>{
+    if (S.role !== "admin") return;
+    const ids = Array.from(document.querySelectorAll("[data-pick-svc]"))
+      .filter(x=>x.checked)
+      .map(x=>x.getAttribute("data-pick-svc"));
+
+    if (!ids.length) return toast("No hay selección.");
+    if (!confirm(`Borrar ${ids.length} servicios?`)) return;
+
+    const batch = db.batch();
+    ids.forEach(id=> batch.delete(db.collection(C.SERVICES).doc(id)));
+    await batch.commit();
+
+    toast("Borrados ✅");
+    await renderServicesAdmin();
+  });
+
+  /* =========================
+     19) Admin: Weekly Close + PDF
+  ========================= */
+  async function weeklyData(weekISO, driverUid){
+    let q = db.collection(C.SERVICES).where("weekISO","==",weekISO);
+    if (driverUid) q = q.where("driverUid","==",driverUid);
+    const snap = await q.get();
+    return snap.docs.map(d=>d.data());
+  }
+
+  function totals(rows){
+    return {
+      count: rows.length,
+      miles: round2(rows.reduce((a,s)=>a+num(s.miles),0)),
+      bruto: round2(rows.reduce((a,s)=>a+num(s.bruto),0)),
+      connectAdj: round2(rows.reduce((a,s)=>a+num(s.connectAdj),0)),
+      netSplit: round2(rows.reduce((a,s)=>a+num(s.netSplit),0)),
+      company: round2(rows.reduce((a,s)=>a+num(s.company),0)),
+      retention: round2(rows.reduce((a,s)=>a+num(s.retention),0)),
+      driverNet: round2(rows.reduce((a,s)=>a+num(s.driverNet),0)),
+    };
+  }
+
+  async function buildWeekly(exportPdf){
+    if (S.role !== "admin") return;
+
+    const weekISO = $("wkStart").value || mondayOf(todayISO());
+    const driverUid = $("wkDriver").value || "";
+
+    const rows = await weeklyData(weekISO, driverUid);
+    const t = totals(rows);
+
+    const who = driverUid
+      ? (S.users.find(u=>u.uid===driverUid)?.email || driverUid)
+      : "TODOS";
+
+    const box = $("weeklyBox");
+    if (box){
+      box.innerHTML = `
+        <h3>${escapeHtml(S.settings.brand)} — Cierre</h3>
+        <div class="muted">Semana: <b>${escapeHtml(weekISO)}</b> • Chofer: <b>${escapeHtml(who)}</b></div>
+        <div class="hr"></div>
+        <div class="row"><span>Servicios</span><b>${t.count}</b></div>
+        <div class="row"><span>Millas</span><b>${t.miles.toFixed(1)}</b></div>
+        <div class="row"><span>Bruto</span><b>${money(t.bruto)}</b></div>
+        <div class="row"><span>Ajuste Connect</span><b>-${money(t.connectAdj)}</b></div>
+        <div class="row"><span>Empresa</span><b>${money(t.company)}</b></div>
+        <div class="row"><span>Retención</span><b>-${money(t.retention)}</b></div>
+        <div class="row"><span><b>Neto chofer</b></span><b>${money(t.driverNet)}</b></div>
+        <div class="hr"></div>
+        <div class="muted">${escapeHtml(S.settings.footer||"")}</div>
+      `;
+    }
+
+    if (!exportPdf) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"pt", format:"letter" });
+    const mx = 40;
+    let y = 50;
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(16);
+    doc.text(`${S.settings.brand} — Cierre Semanal`, mx, y); y+=18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.text(`Semana: ${weekISO}  |  Chofer: ${who}`, mx, y); y+=16;
+
+    doc.setFont("helvetica","bold"); doc.text("Totales", mx, y); y+=14;
+    doc.setFont("helvetica","normal");
+    const line=(t)=>{ doc.text(t, mx, y); y+=12; if(y>740){ doc.addPage(); y=50; } };
+
+    line(`Servicios: ${t.count}`);
+    line(`Millas: ${t.miles.toFixed(1)}`);
+    line(`Bruto: ${money(t.bruto)}`);
+    line(`Ajuste Connect: -${money(t.connectAdj)}`);
+    line(`Empresa: ${money(t.company)}`);
+    line(`Retención: -${money(t.retention)}`);
+    line(`Neto chofer: ${money(t.driverNet)}`);
+
+    y+=10;
+    doc.setFontSize(9);
+    doc.text(S.settings.footer || "", mx, y);
+
+    doc.save(`cierre_${weekISO}.pdf`);
+  }
+
+  $("btnBuildWeekly")?.addEventListener("click", ()=>buildWeekly(false));
+  $("btnWeeklyPDF")?.addEventListener("click", ()=>buildWeekly(true));
+
+  /* =========================
+     20) Admin: Invoice by client + PDF
+  ========================= */
+  async function invoiceData(weekISO, clientId){
+    let q = db.collection(C.SERVICES).where("weekISO","==",weekISO);
+    if (clientId) q = q.where("clientId","==",clientId);
+    const snap = await q.get();
+    return snap.docs.map(d=>d.data()).sort((a,b)=> (a.dateISO < b.dateISO ? 1 : -1));
+  }
+
+  async function buildInvoice(exportPdf){
+    if (S.role !== "admin") return;
+
+    const weekISO = $("invWeek").value || mondayOf(todayISO());
+    const clientId = $("invClient").value || "";
+    if (!clientId) return toast("Selecciona cliente.");
+
+    const client = S.clients.find(c=>c.id===clientId);
+    const rows = await invoiceData(weekISO, clientId);
+
+    const bruto = round2(rows.reduce((a,s)=>a+num(s.bruto),0));
+    const connectAdj = (client?.connect) ? round2(bruto * num(S.settings.connectPct)) : 0;
+    const total = round2(bruto - connectAdj);
+
+    const box = $("invoiceBox");
+    if (box){
+      box.innerHTML = `
+        <h3>Factura — ${escapeHtml(S.settings.brand)}</h3>
+        <div class="muted">Cliente: <b>${escapeHtml(client?.name||"")}</b> • Semana: <b>${escapeHtml(weekISO)}</b></div>
+        <div class="hr"></div>
+        ${rows.slice(0,140).map(r=>`
+          <div class="row">
+            <span>${escapeHtml(r.dateISO)} • ${escapeHtml(r.driverEmail)} • ${round2(r.miles).toFixed(1)} mi</span>
+            <b>${money(r.bruto)}</b>
+          </div>
+        `).join("")}
+        ${rows.length>140 ? `<div class="muted" style="margin-top:8px">*Vista previa recortada. PDF incluye todo.</div>` : ""}
+        <div class="hr"></div>
+        <div class="row"><span>Total Bruto</span><b>${money(bruto)}</b></div>
+        ${(client?.connect) ? `<div class="row"><span>Ajuste Connect</span><b>-${money(connectAdj)}</b></div>` : ""}
+        <div class="row"><span><b>Total a facturar</b></span><b>${money(total)}</b></div>
+        <div class="hr"></div>
+        <div class="muted">${escapeHtml(S.settings.footer||"")}</div>
+      `;
+    }
+
+    if (!exportPdf) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"pt", format:"letter" });
+    const mx = 40;
+    let y = 50;
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(16);
+    doc.text(`Factura — ${S.settings.brand}`, mx, y); y+=18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.text(`Cliente: ${client?.name||""} | Semana: ${weekISO}`, mx, y); y+=16;
+
+    const line=(t)=>{ doc.text(t, mx, y); y+=12; if(y>740){ doc.addPage(); y=50; } };
+
+    rows.slice().reverse().forEach(r=>{
+      line(`${r.dateISO} | ${r.driverEmail} | ${round2(r.miles).toFixed(1)} mi | ${money(r.bruto)}`);
+    });
+
+    y+=12;
+    line(`Total Bruto: ${money(bruto)}`);
+    if (client?.connect) line(`Ajuste Connect: -${money(connectAdj)}`);
+    line(`Total a facturar: ${money(total)}`);
+
+    y+=10;
+    doc.setFontSize(9);
+    doc.text(S.settings.footer || "", mx, y);
+
+    doc.save(`factura_${weekISO}_${(client?.name||"cliente").replaceAll(" ","_")}.pdf`);
+  }
+
+  $("btnBuildInvoice")?.addEventListener("click", ()=>buildInvoice(false));
+  $("btnInvoicePDF")?.addEventListener("click", ()=>buildInvoice(true));
+
+  /* =========================
+     21) Settings save
+  ========================= */
+  function prefillSettingsForm(){
+    $("brandName") && ($("brandName").textContent = S.settings.brand || DEFAULT_SETTINGS.brand);
+    $("setBrand") && ($("setBrand").value = S.settings.brand ?? DEFAULT_SETTINGS.brand);
+    $("setConnect") && ($("setConnect").value = S.settings.connectPct ?? DEFAULT_SETTINGS.connectPct);
+    $("setCompany") && ($("setCompany").value = S.settings.companyPct ?? DEFAULT_SETTINGS.companyPct);
+    $("setRetention") && ($("setRetention").value = S.settings.retentionPct ?? DEFAULT_SETTINGS.retentionPct);
+    $("setFooter") && ($("setFooter").value = S.settings.footer ?? DEFAULT_SETTINGS.footer);
+  }
+
+  $("btnSaveSettings")?.addEventListener("click", async ()=>{
+    if (S.role !== "admin") return;
+
+    const brand = ($("setBrand").value || "").trim() || DEFAULT_SETTINGS.brand;
+    const connectPct = num($("setConnect").value);
+    const companyPct = num($("setCompany").value);
+    const retentionPct = num($("setRetention").value);
+    const footer = ($("setFooter").value || "").trim() || DEFAULT_SETTINGS.footer;
+
+    await db.collection(C.SETTINGS).doc("global").set({
+      brand, connectPct, companyPct, retentionPct, footer,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    await loadSettings(true);
+    prefillSettingsForm();
+    toast("Settings guardados ✅");
+    await refreshAll();
+  });
+
+  $("btnWipeCache")?.addEventListener("click", ()=>{
+    localStorage.removeItem(CACHE.SETTINGS);
+    localStorage.removeItem(CACHE.CLIENTS);
+    localStorage.removeItem(CACHE.USERS);
+    toast("Cache local limpiado ✅");
+  });
+
+  /* =========================
+     22) Refresh orchestration
+  ========================= */
+  async function refreshAll(){
+    if (!S.user) { setView("login"); return; }
+
+    await loadSettings(true);
+    await loadClients(true);
+    if (S.role === "admin") await loadUsers(true);
+
+    fillClients("qsClient");
+    fillClients("sClient");
+    fillClients("invClient");
+    fillDrivers("sDriver");
+    fillDrivers("wkDriver");
+
+    prefillSettingsForm();
+
+    await renderDashboard();
+
+    if (S.role === "admin"){
+      await renderUsers();
+      await renderClients();
+      await renderServicesAdmin();
+    } else {
+      await renderDriverHistory();
+    }
+  }
+
+  async function refreshView(view){
+    if (!S.user) { setView("login"); return; }
+
+    if (view === "dashboard") return renderDashboard();
+    if (view === "driver") return renderDriverHistory();
+    if (view === "adminUsers") return renderUsers();
+    if (view === "adminClients") return renderClients();
+    if (view === "adminServices") return renderServicesAdmin();
+    return;
+  }
+
+  // Arranque UI
+  setShell(false);
 })();

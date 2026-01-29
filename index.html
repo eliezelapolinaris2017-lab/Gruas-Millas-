@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Nexus Transport — Cuadre por Millas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Nexus Transport</h1>
+</header>
+
+<main class="container">
+
+  <section class="card">
+    <h2>Datos del Servicio</h2>
+
+    <label>Chofer</label>
+    <input id="driver" type="text">
+
+    <label>Fecha</label>
+    <input id="date" type="date">
+
+    <label>Millas</label>
+    <input id="millas" type="number">
+
+    <label>Enganche</label>
+    <input id="enganche" type="number">
+
+    <label>Viales</label>
+    <input id="viales" type="number">
+  </section>
+
+  <section class="card">
+    <h2>Compañías</h2>
+
+    <input id="cops" placeholder="COPS">
+    <input id="aaa" placeholder="AAA">
+    <input id="enterprise" placeholder="Enterprise">
+    <input id="mapfre" placeholder="Mapfre">
+    <input id="creditos" placeholder="Créditos">
+    <input id="erika" placeholder="Erika / Code Pola">
+  </section>
+
+  <section class="card">
+    <h2>Servicios Adicionales</h2>
+
+    <input id="ath" placeholder="ATH Móvil">
+    <input id="salvamentos" placeholder="Salvamentos">
+    <input id="od" placeholder="OD (Connect)">
+    <input id="extracciones" placeholder="Extracciones">
+  </section>
+
+  <section class="card">
+    <h2>Cash / Gastos</h2>
+
+    <input id="cashRecibo" placeholder="Cash en recibo">
+    <input id="cashChofer" placeholder="Cash chofer">
+    <input id="gastos" placeholder="Gastos">
+  </section>
+
+  <button id="saveBtn">Guardar Servicio</button>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
